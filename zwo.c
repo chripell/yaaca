@@ -423,7 +423,7 @@ void zwo_get_pars(void *cam, int *w, int *h, int *format, int *Bpp, int *sx, int
 
 void zwo_pulse (int dir, int n)
 {
-  fprintf(stderr, "PULSE DELME %d %d\n", dir, n);
+  //fprintf(stderr, "PULSE %d %d\n", dir, n);
   pulseGuide(dir, n);
 }
 

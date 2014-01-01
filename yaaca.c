@@ -981,7 +981,7 @@ int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
       snprintf(fname, MAX_PATH, "%s/%010ld_%06ld:%d_%d_%d.png", capture_path, tv.tv_sec, tv.tv_usec, format, gain, exposure);
       writeImage(fname, w, h, format == YAACA_FMT_RAW16 ? 16 : 8, format == YAACA_FMT_RGB24, data, capture_compress);
     }
-    fprintf(stderr, "written %s\n", fname);
+    //fprintf(stderr, "written %s\n", fname);
   }
   return 0;
 }
