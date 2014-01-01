@@ -480,7 +480,7 @@ static gboolean redraw_image(gpointer user_data)
       unsigned char *oo = gdk_pixbuf_get_pixels(zoom_imb);
       char m_t[200];
       double xm = 0, ym = 0, xd = 0, yd = 0, s = 0;
-      int m_m = 0;
+      int m_m = 0, m_mm = 0;
 
       for(i = -nx/2 ; i < nx/2; i++)
 	for(j = -ny/2 ; j < ny/2; j++) {
@@ -526,8 +526,21 @@ static gboolean redraw_image(gpointer user_data)
 	  }
       xd = sqrt(xd / s);
       yd = sqrt(yd / s);
-      snprintf(m_t, 200, "(%5.1f,%5.1f) (%5.1f,%5.1f) (%3d,%3d)", xm, ym, xd, yd, m_m,
-	       (OXY((int)xm, (int)ym, 0) + OXY((int)xm, (int)ym, 1) + OXY((int)xm, (int)ym, 2)) / 3);
+      for(i = -1; i < 2; i++)
+	for(j = -1; j < 2; j++) {
+	  int x = xm + i;
+	  int y = ym + j;
+
+	  if (x >= 0 && x < zoom_imbw && y >= 0 && y < zoom_imbh) {
+	    for(c = 0; c < 3; c++) {
+	      int v = OXY(x, y, c);
+
+	      if (v > m_mm)
+		m_mm = v;
+	    }
+	  }
+	}
+      snprintf(m_t, 200, "(%5.1f,%5.1f) (%5.1f,%5.1f) (%3d,%3d)", xm, ym, xd, yd, m_m, m_mm);
       gtk_label_set_text(GTK_LABEL(m_text), m_t);
       if (f_m_save) {
 	static struct timeval last_save;
