@@ -580,7 +580,7 @@ static GtkWidget *pulse_n;
 
 static void pulse_press( GtkWidget *widget, gpointer data )
 {
-  int dir = (int) data;
+  long dir = (long) data;
 
   ccam->pulse(dir, atoi(gtk_entry_get_text(GTK_ENTRY(pulse_n))));
 }
