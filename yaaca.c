@@ -63,10 +63,10 @@ static int cimg_format;
 static int cimg_bpp;
 static unsigned char *cimg;
 
-static GtkWidget *w_capture_path, *w_do_capture, *w_capture_raw, *w_capture_compress;
+static GtkWidget *w_capture_path, *w_do_capture, *w_capture_raw, *w_capture_compress, *w_capture_blind;
 static char capture_path[MAX_PATH];
 static int do_capture;
-static int capture_raw, capture_compress;
+static int capture_raw, capture_compress, capture_blind;
 
 static int gain, exposure, format, resolution;
 
@@ -251,7 +251,13 @@ static void update_do_capture( GtkWidget *w, gpointer p )
   snprintf(capture_path, MAX_PATH, "%s", dir);
   capture_raw = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_raw));
   capture_compress = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_compress));
+  capture_blind = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_blind));
   do_capture = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
+}
+
+static void update_blind( GtkWidget *w, gpointer p )
+{
+  capture_blind = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
 }
 
 static void set_w_int(GtkWidget *w, int v)
@@ -868,6 +874,7 @@ int main(int argc, char *argv[])
   gtk_box_pack_start(GTK_BOX (box), (w_do_capture = create_check("capture", G_CALLBACK (update_do_capture))), TRUE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (box), (w_capture_raw = create_check("PBM", NULL)), TRUE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (box), (w_capture_compress = create_check("compress", NULL)), TRUE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (box), (w_capture_blind = create_check("blind", G_CALLBACK (update_blind))), TRUE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (capture_box), box, TRUE, TRUE, 0);
 
   pulse_table = gtk_table_new(3, 3, TRUE);
@@ -940,7 +947,7 @@ int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
       data[i + 1] = t;
     }
   }
-  if (!cimg_present) {
+  if (!cimg_present && (!capture_blind || !do_capture)) {
     //fprintf(stderr, "SCH %d\n", bpp);
     memcpy(cimg, data, w * h * bpp);
     cimg_w = w;
