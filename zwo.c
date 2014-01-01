@@ -28,7 +28,9 @@
 
 #include "yaaca.h"
 
-static char *resolutions[] = {
+static char **resolutions;
+static char *all_resolutions[] = {
+  "10000x10000@666FPS",
   "1280X960@35FPS",
   "1280X720@46FPS",
   "1280X600@55FPS",
@@ -52,7 +54,9 @@ static char *resolutions[] = {
   NULL,
 };
 
-static int resolutions_x[] = {
+static int *resolutions_x;
+static int all_resolutions_x[] = {
+  10000,
   1280,
   1280,
   1280,
@@ -75,7 +79,9 @@ static int resolutions_x[] = {
   640,
 };
 
-static int resolutions_y[] = {
+static int *resolutions_y;
+static int all_resolutions_y[] = {
+  10000,
   960,
   720,
   600,
@@ -269,6 +275,13 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
 
   *maxw = getMaxWidth();
   *maxh = getMaxHeight();
+
+  i = 0;
+  while (all_resolutions_x[i] > *maxw || all_resolutions_y[i] > *maxh)
+    i++;
+  resolutions = &all_resolutions[i];
+  resolutions_x = &all_resolutions_x[i];
+  resolutions_y = &all_resolutions_y[i];
 
   c = calloc(30, sizeof(struct yaaca_ctrl));
   assert(c);
