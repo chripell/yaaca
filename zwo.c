@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/utsname.h>
 
 #include "ASICamera.h"
 
@@ -252,6 +253,7 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   struct zwo_cam *z;
   int nc, i;
   int numDevices;
+  struct utsname uts;
 
   numDevices = getNumberOfConnectedCameras();
   if(numDevices <= 0) {
@@ -271,6 +273,12 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   if (!initCamera()) {
     fprintf(stderr, "initCamera failed\n");
     return NULL;
+  }
+
+  uname(&uts);
+  if (!strncmp(uts.machine, "arm", 3)) {
+    fprintf(stderr, "Found ARM machine setting USB BW to min\n");
+    setValue(CONTROL_BANDWIDTHOVERLOAD, getMin(CONTROL_BANDWIDTHOVERLOAD), 0);
   }
 
   *maxw = getMaxWidth();
