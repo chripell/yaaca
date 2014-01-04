@@ -70,6 +70,10 @@ static int capture_raw, capture_compress, capture_blind;
 
 static int gain, exposure, format, resolution;
 
+static float fps;
+static struct timeval last_fps_comp;
+static int fps_n;
+
 int writeImage(const char* filename, int width, int height, int bpp, int color, unsigned char *buffer, int compress)
 {
    int code = 0;
@@ -252,6 +256,10 @@ static void update_do_capture( GtkWidget *w, gpointer p )
   capture_raw = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_raw));
   capture_compress = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_compress));
   capture_blind = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_blind));
+  last_fps_comp.tv_sec = 0;
+  last_fps_comp.tv_usec = 0;
+  fps = 0.0;
+  fps_n = 0;
   do_capture = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
 }
 
@@ -359,13 +367,23 @@ static int get_raw16_pix(int i, int j, int w)
   return im16[y * cimg_w + x + w];
 }
 
+static gboolean redraw_fps(gpointer user_data)
+{
+  char stat[200];
+
+  if (do_capture)
+    snprintf(stat, 200, "T: %.1f, Dropped: %.0f FPS: %.2f", ccam->get(cam, 3), ccam->get(cam, 4), fps);
+  else
+    snprintf(stat, 200, "T: %.1f, Dropped: %.0f", ccam->get(cam, 3), ccam->get(cam, 4));
+  gtk_label_set_text(GTK_LABEL(status2), stat);
+  return FALSE;
+}
+
 static gboolean redraw_image(gpointer user_data)
 {
   int i,j;
-  char stat[200];
 
-  snprintf(stat, 200, "T: %.1f, Dropped: %.0f", ccam->get(cam, 3), ccam->get(cam, 4));
-  gtk_label_set_text(GTK_LABEL(status2), stat);
+  redraw_fps(user_data);
 
   if (cimg_present) {
     int hmin, hmax;
@@ -926,9 +944,15 @@ int main(int argc, char *argv[])
   return 0;
 }
 
+static int diff_us(struct timeval from, struct timeval to)
+{
+  return 1000000 * (to.tv_sec - from.tv_sec) + (to.tv_usec - from.tv_usec);
+}
+
 int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
 {
   int i;
+  struct timeval now;
 
   //fprintf(stderr, "NI\n");
   if (format == YAACA_FMT_RGB24) {
@@ -982,6 +1006,24 @@ int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
       writeImage(fname, w, h, format == YAACA_FMT_RAW16 ? 16 : 8, format == YAACA_FMT_RGB24, data, capture_compress);
     }
     //fprintf(stderr, "written %s\n", fname);
+    fps_n += 1;
+    if (last_fps_comp.tv_sec == 0 && last_fps_comp.tv_usec == 0)
+      gettimeofday(&last_fps_comp, NULL);
+    else {
+      int e;
+
+      gettimeofday(&now, NULL);
+      e = diff_us(last_fps_comp, now);
+      if (e > 1000000) {
+	float xframe = ((float) e) / fps_n;
+
+	fps = 1000000.0 / xframe;
+	if (capture_blind)
+	  g_timeout_add(1, redraw_fps, NULL);
+	last_fps_comp = now;
+	fps_n = 0;
+      }
+    }
   }
   return 0;
 }
