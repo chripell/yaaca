@@ -38,7 +38,7 @@ struct yaaca_ctrl {
   char name[YAACA_MAX_NAME];
   int type;
   double min, max, def;
-  int def_auto;
+  char def_auto;
   char **text;
   int flags;
 };

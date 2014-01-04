@@ -252,6 +252,8 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   struct yaaca_ctrl *c;
   struct zwo_cam *z;
   int nc, i;
+  char aa;
+  int av;
   int numDevices;
   struct utsname uts;
 
@@ -291,6 +293,11 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   resolutions_x = &all_resolutions_x[i];
   resolutions_y = &all_resolutions_y[i];
 
+  av = getValue(CONTROL_GAIN, &aa);
+  setValue(CONTROL_GAIN, av, 1);
+  av = getValue(CONTROL_EXPOSURE, &aa);
+  setValue(CONTROL_EXPOSURE, av, 1);
+
   c = calloc(30, sizeof(struct yaaca_ctrl));
   assert(c);
 
@@ -323,7 +330,7 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
     NEW_CTRL(YAACA_REAL, controls[i], getMin(i), getMax(i), NULL,
 	     isAutoSupported(i) ? YAACA_AUTO : 0 |
 	     isAvailable(i) ? 0 : YAACA_OFF,
-	     getValue(i, &c[i].def_auto)); /* 12 + i */
+	     getValue(i, &c[nc].def_auto)); /* 12 + i */
   }
 
   z = calloc(1, sizeof(*z));

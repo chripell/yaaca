@@ -36,7 +36,7 @@ enum BayerPattern{
 };
 
 #ifndef _cplusplus
-#define bool int
+#define bool char
 #define BayerPattern int
 #define Control_TYPE int
 #define IMG_TYPE int
