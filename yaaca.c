@@ -256,10 +256,6 @@ static void update_do_capture( GtkWidget *w, gpointer p )
   capture_raw = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_raw));
   capture_compress = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_compress));
   capture_blind = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_blind));
-  last_fps_comp.tv_sec = 0;
-  last_fps_comp.tv_usec = 0;
-  fps = 0.0;
-  fps_n = 0;
   do_capture = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
 }
 
@@ -371,10 +367,7 @@ static gboolean redraw_fps(gpointer user_data)
 {
   char stat[200];
 
-  if (do_capture)
-    snprintf(stat, 200, "T: %.1f, Dropped: %.0f FPS: %.2f", ccam->get(cam, 3), ccam->get(cam, 4), fps);
-  else
-    snprintf(stat, 200, "T: %.1f, Dropped: %.0f", ccam->get(cam, 3), ccam->get(cam, 4));
+  snprintf(stat, 200, "T: %.1f, Dropped: %.0f FPS: %.2f", ccam->get(cam, 3), ccam->get(cam, 4), fps);
   gtk_label_set_text(GTK_LABEL(status2), stat);
   return FALSE;
 }
@@ -1006,23 +999,23 @@ int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
       writeImage(fname, w, h, format == YAACA_FMT_RAW16 ? 16 : 8, format == YAACA_FMT_RGB24, data, capture_compress);
     }
     //fprintf(stderr, "written %s\n", fname);
-    fps_n += 1;
-    if (last_fps_comp.tv_sec == 0 && last_fps_comp.tv_usec == 0)
-      gettimeofday(&last_fps_comp, NULL);
-    else {
-      int e;
+  }
+  fps_n += 1;
+  if (last_fps_comp.tv_sec == 0 && last_fps_comp.tv_usec == 0)
+    gettimeofday(&last_fps_comp, NULL);
+  else {
+    int e;
 
-      gettimeofday(&now, NULL);
-      e = diff_us(last_fps_comp, now);
-      if (e > 1000000) {
-	float xframe = ((float) e) / fps_n;
+    gettimeofday(&now, NULL);
+    e = diff_us(last_fps_comp, now);
+    if (e > 1000000) {
+      float xframe = ((float) e) / fps_n;
 
-	fps = 1000000.0 / xframe;
-	if (capture_blind)
-	  g_timeout_add(1, redraw_fps, NULL);
-	last_fps_comp = now;
-	fps_n = 0;
-      }
+      fps = 1000000.0 / xframe;
+      if (capture_blind)
+	g_timeout_add(1, redraw_fps, NULL);
+      last_fps_comp = now;
+      fps_n = 0;
     }
   }
   return 0;
