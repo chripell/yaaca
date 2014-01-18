@@ -765,6 +765,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "CAM not found!\n");
     exit(1);
   }
+  ccam->load(cam);
   cimg =  malloc(maxw * maxh * 3);
   save_row = malloc(maxw * 3);
   save_col = malloc(maxh * 3);
@@ -933,7 +934,7 @@ int main(int argc, char *argv[])
   gtk_widget_show (window);
   ccam->run(cam, 1);
   gtk_main ();
-
+  ccam->save(cam);
   return 0;
 }
 

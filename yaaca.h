@@ -53,6 +53,8 @@ struct yaaca_cam_s {
   void (*run)(void *cam, int r);
   void (*get_pars) (void *cam, int *w, int *h, int *format, int *Bpp, int *sx, int *sy);
   void (*pulse) (int dir, int n);
+  void (*save) (void *cam);
+  void (*load) (void *cam);
 };
 
 #define YAACA_FMT_RAW8 0

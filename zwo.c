@@ -24,6 +24,12 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/utsname.h>
+#include <sys/types.h>
+#include <pwd.h>
+
+#ifndef MAX_PATH
+#define MAX_PATH 255
+#endif
 
 #include "ASICamera.h"
 
@@ -105,6 +111,33 @@ static int all_resolutions_y[] = {
   480,
 };
 
+static int *resolutions_bin;
+static int all_resolutions_bin[] = {
+  0,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  2,
+};
+
+static int resolutions_n;
+
 static char *formats[] = {
   "RAW8",
   "RGB24",
@@ -169,7 +202,7 @@ struct zwo_cam {
 
 static void zwo_setup(struct zwo_cam *z)
 {
-  int bin = z->resolution == 19 ? 2 : 1;
+  int bin = resolutions_bin[z->resolution];
   int w = resolutions_x[z->resolution];
   int h = resolutions_y[z->resolution];
 
@@ -247,9 +280,11 @@ static gpointer zwo_worker(gpointer z_)
   return NULL;
 }
 
+static int zwo_n;
+static struct yaaca_ctrl *c;
+
 static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *maxw, int *maxh)
 {
-  struct yaaca_ctrl *c;
   struct zwo_cam *z;
   int nc, i;
   char aa;
@@ -276,6 +311,7 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
     fprintf(stderr, "initCamera failed\n");
     return NULL;
   }
+  zwo_n = n;
 
   uname(&uts);
   if (!strncmp(uts.machine, "arm", 3)) {
@@ -292,6 +328,9 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   resolutions = &all_resolutions[i];
   resolutions_x = &all_resolutions_x[i];
   resolutions_y = &all_resolutions_y[i];
+  resolutions_bin = &all_resolutions_bin[i];
+  while (resolutions[resolutions_n])
+    resolutions_n++;
 
   av = getValue(CONTROL_GAIN, &aa);
   setValue(CONTROL_GAIN, av, 1);
@@ -324,7 +363,7 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   NEW_CTRL(YAACA_REAL, "color", 0, 1, NULL, YAACA_RO, 0);	    /* 8 */
   NEW_CTRL(YAACA_REAL, "start x", 0, *maxw, NULL, 0, 0);	    /* 9 */
   NEW_CTRL(YAACA_REAL, "start y", 0, *maxh, NULL, 0, 0);	    /* 10 */
-  NEW_CTRL(YAACA_ENUM, "resolution", 0, 19, &resolutions[0], 0, 0); /* 11 */
+  NEW_CTRL(YAACA_ENUM, "resolution", 0, resolutions_n, &resolutions[0], 0, 0); /* 11 */
 
   for (i = 0; i < 7; i++) {
     NEW_CTRL(YAACA_REAL, controls[i], getMin(i), getMax(i), NULL,
@@ -442,6 +481,105 @@ void zwo_pulse (int dir, int n)
   pulseGuide(dir, n);
 }
 
+static const char *home;
+
+static const char *get_home(void)
+{
+  if (home)
+    return home;
+
+  home = getenv("HOME");
+  if (!home) {
+    struct passwd *pw = getpwuid(getuid());
+    home = pw->pw_dir;
+  }
+  return home;
+}
+
+static void zwo_load(void *cam)
+{
+  struct zwo_cam *z = cam;
+  char fname[MAX_PATH];
+  FILE *f;
+  int i;
+
+  snprintf(fname, MAX_PATH, "%s/.ASICamera%d", get_home(), zwo_n);
+  f = fopen(fname, "r");
+  if (f) {
+    int x,y,w,h,m,b,fx,fy;
+    int reso = 0;
+    if (fscanf(f, "%d %d\n%d %d\n%d %d\n%d %d\n", &x, &y, &w, &h, &fx, &fy, &m, &b) != 8)
+      goto load_err;
+    c[1].def = fx;
+    zwo_set(z, 1, fx, 0);
+    c[2].def = fy;
+    zwo_set(z, 2, fy, 0);
+    SetMisc(fx, fy);
+    c[9].def = x;
+    zwo_set(z, 9, x, 0);
+    c[10].def = y;
+    zwo_set(z, 10, y, 0);
+    setStartPos(x, y);
+    i = 0;
+    while (resolutions[i]) {
+      if (resolutions_x[i] == w && resolutions_y[i] == h && resolutions_bin[i] == b) {
+	reso = i;
+	break;
+      }
+      i++;
+    }
+    c[11].def = reso;
+    zwo_set(z, 11, reso, 0);
+    c[0].def = m;
+    zwo_set(z, 0, m, 0);
+    setImageFormat(w, h, b, m);
+    for(i = 0; i < 7; i++) {
+      int v, a;
+
+      if (fscanf(f, "%d %d\n", &v, &a) != 2)
+	goto load_err;
+      c[12 + i].def = v;
+      c[12 + i].def_auto = a;
+      zwo_set(z, 12 + i, v, a);
+      setValue(i, v, a);
+    }
+  load_err:
+    fclose(f);
+  }
+}
+
+static void zwo_save(void *cam)
+{
+  char fname[MAX_PATH];
+  FILE *f;
+  int i;
+
+  snprintf(fname, MAX_PATH, "%s/.ASICamera%d", get_home(), zwo_n);
+  f = fopen(fname, "w");
+  if (f) {
+    char fx, fy;
+
+    GetMisc(&fx, &fy);
+    fprintf(f,
+	    "%d %d\n"
+	    "%d %d\n"
+	    "%d %d\n"
+	    "%d %d\n",
+	    getStartX(), getStartY(),
+	    getWidth(), getHeight(),
+	    fx != 0, fy != 0,
+	    getImgType(), getBin());
+    for(i = 0; i < 7; i++) {
+      int v;
+      char a;
+
+      v = getValue(i, &a);
+      fprintf(f, "%d %d\n", v, a != 0);
+    }
+    fclose(f);
+  }
+}
+
 struct yaaca_cam_s ZWO_CAM = {
   "ZWO Asi Camera",
   zwo_cam_init,
@@ -452,4 +590,6 @@ struct yaaca_cam_s ZWO_CAM = {
   zwo_run,
   zwo_get_pars,
   zwo_pulse,
+  zwo_save,
+  zwo_load,
 };
