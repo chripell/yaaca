@@ -45,7 +45,7 @@ static int imbw, imbh;
 static GdkPixbuf *imb;
 static GtkWidget *status2;
 
-static GtkWidget *zoom_im, *cross_pos, *zoom_factor, *m_box;
+static GtkWidget *zoom_im, *cross_pos, *cross_val, *zoom_factor, *m_box;
 static GtkWidget *m_text, *m_save;
 static FILE  *f_m_save = NULL;
 static GdkPixbuf *zoom_imb;
@@ -156,6 +156,7 @@ static unsigned char *save_row, *save_col;
 static void show_cross(int draw, int restore)
 {
   int i;
+  char b[50];
   unsigned char *o = gdk_pixbuf_get_pixels(imb);
 #define O(X,Y) &o[3 * ((Y) * imbw + (X))]
 
@@ -166,6 +167,14 @@ static void show_cross(int draw, int restore)
     for(i = 0; i < imbh; i++) {
       memcpy(O(ocross_x, i), &save_col[i * 3], 3);
     }
+  }
+
+  if (cross_val) {
+    sprintf(b, "=%03d,%03d,%03d ",
+	    (O(cross_x, cross_y))[0],
+	    (O(cross_x, cross_y))[1],
+	    (O(cross_x, cross_y))[2]);
+    gtk_label_set_text(GTK_LABEL(cross_val), b);
   }
 
   if (draw && is_cross) {
@@ -197,9 +206,10 @@ static void update_cross_pos(void)
 {
   char b[50];
 
-  snprintf(b, 50, " (%d,%d) ", cross_x, cross_y);
-  if (cross_pos)
+  if (cross_pos) {
+    snprintf(b, 50, " (%d,%d)", cross_x, cross_y);
     gtk_label_set_text(GTK_LABEL(cross_pos), b);
+  }
 }
 
 static void update_cross( GtkWidget *w, gpointer p )
@@ -902,10 +912,11 @@ int main(int argc, char *argv[])
   gtk_widget_show(zoom_box);
   cross_box = gtk_hbox_new (FALSE, 0);
   gtk_widget_show(cross_box);
-  gtk_box_pack_start(GTK_BOX (cross_box), create_check("show cross", G_CALLBACK (update_cross)), FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (cross_box), create_check("cross", G_CALLBACK (update_cross)), FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (cross_box), (cross_pos = create_label("(0,0)")), FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (cross_box), (cross_val = create_label("=000,0000,000 ")), FALSE, FALSE, 0);
   update_cross_pos();
-  gtk_box_pack_start(GTK_BOX (cross_box), create_entry("zoom (0 off):", &zoom_factor, "0", G_CALLBACK(update_zoom), 1, 1), FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (cross_box), create_entry(" zoom (0 off):", &zoom_factor, "0", G_CALLBACK(update_zoom), 1, 1), FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (zoom_box), cross_box, FALSE, FALSE, 0);
   zoom_im = gtk_image_new();
   zoom_imb = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, zoom_imbw, zoom_imbh);
