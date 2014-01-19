@@ -508,6 +508,7 @@ static gboolean redraw_image(gpointer user_data)
       char m_t[200];
       double xm = 0, ym = 0, xd = 0, yd = 0, s = 0;
       int m_m = 0, m_mm = 0;
+      int xmi, ymi;
 
       for(i = -nx/2 ; i < nx/2; i++)
 	for(j = -ny/2 ; j < ny/2; j++) {
@@ -528,29 +529,35 @@ static gboolean redraw_image(gpointer user_data)
 	  }
 	}
       gtk_image_set_from_pixbuf(GTK_IMAGE(zoom_im), zoom_imb);
+#define CENT_THR 64
       for(i = 0; i < zoom_imbw; i++)
-	for(j = 0; j < zoom_imbh; j++)
-	  for(c = 0; c < 3; c++) {
-	    int v = OXY(i, j, c);
+	for(j = 0; j < zoom_imbh; j++) {
+	  double v = ((double) OXY(i, j, 0) + OXY(i, j, 1) + OXY(i, j, 2)) / 3.0;
 
+	  if (v > CENT_THR) {
 	    xm = xm + i * v;
 	    ym = ym + j * v;
 	    s += v;
-	    if (v > m_m)
-	      m_m = v;
 	  }
+	  if (v > m_m)
+	    m_m = v;
+	}
+      if (s < 1)
+	s = 1;
       xm /= s;
       ym /= s;
       for(i = 0; i < zoom_imbw; i++)
-	for(j = 0; j < zoom_imbh; j++)
-	  for(c = 0; c < 3; c++) {
-	    int v = OXY(i, j, c);
+	for(j = 0; j < zoom_imbh; j++) {
+	  double v = ((double) OXY(i, j, 0) + OXY(i, j, 1) + OXY(i, j, 2)) / 3.0;
+
+	  if (v > CENT_THR) {
 	    double xx = i - xm;
 	    double yy = j - ym;
 
 	    xd += xx * xx * v;
 	    yd += yy * yy * v;
 	  }
+	}
       xd = sqrt(xd / s);
       yd = sqrt(yd / s);
       for(i = -1; i < 2; i++)
@@ -559,16 +566,32 @@ static gboolean redraw_image(gpointer user_data)
 	  int y = ym + j;
 
 	  if (x >= 0 && x < zoom_imbw && y >= 0 && y < zoom_imbh) {
-	    for(c = 0; c < 3; c++) {
-	      int v = OXY(x, y, c);
+	    int v = ((int) OXY(x, y, 0) + OXY(x, y, 1) + OXY(x, y, 2)) / 3;
 
-	      if (v > m_mm)
-		m_mm = v;
-	    }
+	    if (v > m_mm)
+	      m_mm = v;
 	  }
 	}
       snprintf(m_t, 200, "(%5.1f,%5.1f) (%5.1f,%5.1f) (%3d,%3d)", xm, ym, xd, yd, m_m, m_mm);
       gtk_label_set_text(GTK_LABEL(m_text), m_t);
+      xmi = (int) xm;
+      if (xmi <= 0)
+	xmi = 1;
+      if (xmi >= zoom_imbw - 1)
+	xmi = zoom_imbw - 2;
+      ymi = (int) ym;
+      if (ymi <= 0)
+	ymi = 1;
+      if (ymi >= zoom_imbh - 1)
+	ymi = zoom_imbh - 2;
+      for(c = -1; c <= 1; c++) {
+	OXY(xmi+c,ymi,0) = 255;
+	OXY(xmi+c,ymi,1) = 0;
+	OXY(xmi+c,ymi,2) = 0;
+	OXY(xmi,ymi+c,0) = 255;
+	OXY(xmi,ymi+c,1) = 0;
+	OXY(xmi,ymi+c,2) = 0;
+      }
       if (f_m_save) {
 	static struct timeval last_save;
 	struct timeval now;
