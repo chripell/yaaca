@@ -82,7 +82,10 @@ ASICAMERA_API  BayerPattern getColorBayer();
 ASICAMERA_API  char* getCameraModel(int camIndex);
 //get the camera menu type. camIndex 0 means the first one.
 ASICAMERA_API  CAMERA_TYPE getCameraType(int camIndex);
-
+//Subtract Dark using bmp file
+ASICAMERA_API int EnableDarkSubtract(char *BMPPath);
+//Disable Subtracting Dark 
+ASICAMERA_API void DisableDarkSubtract();
 
 // is control supported by current camera
 ASICAMERA_API bool isAvailable(Control_TYPE control) ;   
