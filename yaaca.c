@@ -590,6 +590,10 @@ static gboolean redraw_image(gpointer user_data)
 	int xmi = xm;
 	int ymi = ym;
 
+	if (is_cross) {
+	  xmi = zoom_imbw / 2;
+	  ymi = zoom_imbw / 2;
+	}
 	for (i = 0; i < zoom_imbw; i++) {
 	  prof_x[i] = (OXY(i, ymi, 0) + OXY(i, ymi, 1) + OXY(i, ymi, 2)) / 3;
 	  prof_y[i] = (OXY(xmi, i, 0) + OXY(xmi, i, 1) + OXY(xmi, i, 2)) / 3;
