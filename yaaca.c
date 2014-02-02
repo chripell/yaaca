@@ -46,7 +46,7 @@ static GdkPixbuf *imb;
 static GtkWidget *status2;
 
 static GtkWidget *zoom_im, *cross_pos, *cross_val, *zoom_factor, *m_box;
-static GtkWidget *m_text, *m_save;
+static GtkWidget *m_text, *m_save, *m_prof;
 static FILE  *f_m_save = NULL;
 static GdkPixbuf *zoom_imb;
 static int zoom_imbw = 300, zoom_imbh = 300;
@@ -509,6 +509,9 @@ static gboolean redraw_image(gpointer user_data)
       double xm = 0, ym = 0, xd = 0, yd = 0, s = 0;
       int m_m = 0, m_mm = 0;
       int xmi, ymi;
+      unsigned char prof_x[zoom_imbw];
+      unsigned char prof_y[zoom_imbw]; /* assume zoom_imbw == zoom_imbh */
+      int prof_on = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(m_prof));
 
       for(i = -nx/2 ; i < nx/2; i++)
 	for(j = -ny/2 ; j < ny/2; j++) {
@@ -528,7 +531,6 @@ static gboolean redraw_image(gpointer user_data)
 	      }
 	  }
 	}
-      gtk_image_set_from_pixbuf(GTK_IMAGE(zoom_im), zoom_imb);
 #define CENT_THR 64
       for(i = 0; i < zoom_imbw; i++)
 	for(j = 0; j < zoom_imbh; j++) {
@@ -572,7 +574,7 @@ static gboolean redraw_image(gpointer user_data)
 	      m_mm = v;
 	  }
 	}
-      snprintf(m_t, 200, "(%5.1f,%5.1f) (%5.1f,%5.1f) (%3d,%3d)", xm, ym, xd, yd, m_m, m_mm);
+      snprintf(m_t, 200, "(%5.1f,%5.1f)(%5.1f,%5.1f)(%3d,%3d)", xm, ym, xd, yd, m_m, m_mm);
       gtk_label_set_text(GTK_LABEL(m_text), m_t);
       xmi = (int) xm;
       if (xmi <= 0)
@@ -584,6 +586,15 @@ static gboolean redraw_image(gpointer user_data)
 	ymi = 1;
       if (ymi >= zoom_imbh - 1)
 	ymi = zoom_imbh - 2;
+      if (prof_on) {
+	int xmi = xm;
+	int ymi = ym;
+
+	for (i = 0; i < zoom_imbw; i++) {
+	  prof_x[i] = (OXY(i, ymi, 0) + OXY(i, ymi, 1) + OXY(i, ymi, 2)) / 3;
+	  prof_y[i] = (OXY(xmi, i, 0) + OXY(xmi, i, 1) + OXY(xmi, i, 2)) / 3;
+	}
+      }
       for(c = -1; c <= 1; c++) {
 	OXY(xmi+c,ymi,0) = 255;
 	OXY(xmi+c,ymi,1) = 0;
@@ -592,6 +603,17 @@ static gboolean redraw_image(gpointer user_data)
 	OXY(xmi,ymi+c,1) = 0;
 	OXY(xmi,ymi+c,2) = 0;
       }
+      if (prof_on) {
+	for (i = 0; i < zoom_imbw; i++) {
+	  OXY(i, prof_x[i], 0) = 255;
+	  OXY(i, prof_x[i], 1) = 255;
+	  OXY(i, prof_x[i], 2) = 0;
+	  OXY(prof_y[i], i, 0) = 255;
+	  OXY(prof_y[i], i, 1) = 255;
+	  OXY(prof_y[i], i, 2) = 0;
+	}
+      }
+      gtk_image_set_from_pixbuf(GTK_IMAGE(zoom_im), zoom_imb);
       if (f_m_save) {
 	static struct timeval last_save;
 	struct timeval now;
@@ -948,6 +970,7 @@ int main(int argc, char *argv[])
   m_box = gtk_hbox_new (FALSE, 0);
   gtk_box_pack_start(GTK_BOX (m_box), (m_text = create_label("(0,0)(0,0)(0,0)")), FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (m_box), (m_save = create_check("save", G_CALLBACK(m_cb))), FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (m_box), (m_prof = create_check("prof", G_CALLBACK(m_cb))), FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (zoom_box), m_box, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (right), zoom_box, FALSE, FALSE, 1);
 
