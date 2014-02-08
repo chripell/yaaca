@@ -3,4 +3,5 @@ yaaca
 *.o
 *~
 *.log
+*.deb
 
