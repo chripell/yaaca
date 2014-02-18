@@ -840,7 +840,8 @@ int main(int argc, char *argv[])
   g_thread_init (NULL);
   gtk_init (&argc, &argv);
 
-  cam = ccam->init(0, &ctrls, &n_ctrls, &maxw, &maxh);
+  cam = ccam->init(getenv("YAACA_CAM") ? atoi(getenv("YAACA_CAM")) : 0,
+		   &ctrls, &n_ctrls, &maxw, &maxh);
   if (!cam) {
     fprintf(stderr, "CAM not found!\n");
     exit(1);
