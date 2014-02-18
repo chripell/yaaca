@@ -25,6 +25,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <math.h>
+#include <arpa/inet.h>
 
 #include "yaaca.h"
 
@@ -338,7 +339,6 @@ static void update_ctrl( GtkWidget *w, int n )
       if (sy + h >= 960) sy = 960 - h;
       ccam->set(cam, 10, sy, 0);
       set_w_int(ctrl_val[10], sy);
-      //fprintf(stderr, "DELME %d-%d %d-%d %d-%d %d-%d\n", w, h, sx, sy, osx, osy, cx, cy);
     }
   }
 }
@@ -420,26 +420,47 @@ static gboolean redraw_image(gpointer user_data)
       }
     }
     else if (cimg_format == YAACA_FMT_RAW8) { 
-      for(j = 0; j < cimg_h; j++)
-	for(i = 0; i < cimg_w; i++) {
-	  int z = 3 * (j * cimg_w + i);
+      if (ccam->get(cam, 8)) {
+	for(j = 0; j < cimg_h; j++)
+	  for(i = 0; i < cimg_w; i++) {
+	    int z = 3 * (j * cimg_w + i);
 
-	  /* TODO: serious debayer, gamma */
-	  o[z + 0] = get_raw8_pix(i, j, 1);
-	  o[z + 1] = get_raw8_pix(i, j, 0);
-	  o[z + 2] = get_raw8_pix(i, j, 2);
+	    /* TODO: serious debayer, gamma */
+	    o[z + 0] = get_raw8_pix(i, j, 1);
+	    o[z + 1] = get_raw8_pix(i, j, 0);
+	    o[z + 2] = get_raw8_pix(i, j, 2);
+	  }
+      }
+      else {
+	for (i = 0; i < cimg_w * cimg_h; i++) {
+	  o[3*i + 0] = cimg[i];
+	  o[3*i + 1] = cimg[i];
+	  o[3*i + 2] = cimg[i];
 	}
+      }
     }
     else if (cimg_format == YAACA_FMT_RAW16) {
-      for(j = 0; j < cimg_h; j++)
-	for(i = 0; i < cimg_w; i++) {
-	  int z = 3 * (j * cimg_w + i);
+      if (ccam->get(cam, 8)) {
+	for(j = 0; j < cimg_h; j++)
+	  for(i = 0; i < cimg_w; i++) {
+	    int z = 3 * (j * cimg_w + i);
 
-	  /* TODO: serious debayer, gamma */
-	  o[z + 0] = get_raw16_pix(i, j, 1);
-	  o[z + 1] = get_raw16_pix(i, j, 0);
-	  o[z + 2] = get_raw16_pix(i, j, 2);
+	    /* TODO: serious debayer, gamma */
+	    o[z + 0] = get_raw16_pix(i, j, 1);
+	    o[z + 1] = get_raw16_pix(i, j, 0);
+	    o[z + 2] = get_raw16_pix(i, j, 2);
+	  }
+      }
+      else {
+	unsigned short *s = (unsigned short *) cimg;
+
+	for (i = 0; i < cimg_w * cimg_h; i++) {
+	  int v = ntohs(s[i]) / 256;
+	  o[3*i + 0] = v;
+	  o[3*i + 1] = v;
+	  o[3*i + 2] = v;
 	}
+      }
     }
 
     if (histo_on) {
@@ -1027,7 +1048,7 @@ int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
     }
   }
   if (!cimg_present && (!capture_blind || !do_capture)) {
-    //fprintf(stderr, "SCH %d\n", bpp);
+    //fprintf(stderr, "SCH %d %d\n", bpp, format);
     memcpy(cimg, data, w * h * bpp);
     cimg_w = w;
     cimg_h = h;

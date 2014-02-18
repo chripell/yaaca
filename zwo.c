@@ -138,13 +138,15 @@ static int all_resolutions_bin[] = {
 
 static int resolutions_n;
 
-static char *formats[] = {
+static char *all_formats[] = {
   "RAW8",
   "RGB24",
   "RAW16",
   "Y8",
   NULL,
 };
+static char *formats[3];
+static int n_formats;
 
 static int format_dim[] = {
   1,
@@ -152,6 +154,7 @@ static int format_dim[] = {
   2,
   1,
 };
+static int format2[4];
 
 static char *controls[] = {
   "gain",
@@ -332,6 +335,14 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   while (resolutions[resolutions_n])
     resolutions_n++;
 
+  for(i = 0; i < 4; i++) {
+    if (isImgTypeSupported(i)) {
+      formats[n_formats] = all_formats[i];
+      format2[n_formats] = i;
+      n_formats++;
+    }
+  }
+
   av = getValue(CONTROL_GAIN, &aa);
   setValue(CONTROL_GAIN, av, 1);
   av = getValue(CONTROL_EXPOSURE, &aa);
@@ -347,12 +358,12 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   c[nc].max = MAX;						\
   c[nc].text = TEXT;						\
   c[nc].flags = FLAGS;						\
-  c[nc].def = DEF;						\
+  c[nc].def = (DEF);						\
   nc += 1
 
   nc = 0;
 
-  NEW_CTRL(YAACA_ENUM, "format", 0, 3, &formats[0], 0, 1); /* 0 */
+  NEW_CTRL(YAACA_ENUM, "format", 0, n_formats - 1, &formats[0], 0, n_formats == 4 ? 1 : 0); /* 0 */
   NEW_CTRL(YAACA_ENUM, "flipx", 0, 1, &NY[0], 0, 0);	/* 1 */
   NEW_CTRL(YAACA_ENUM, "flipy", 0, 1, &NY[0], 0, 0);	/* 2 */
   NEW_CTRL(YAACA_REAL, "temp", 0, 0, NULL, YAACA_RO, 0);	/* 3 */
@@ -404,6 +415,9 @@ static int zwo_set(void * cam, int ctrl, double val, int autov)
       return 0;					\
     }						\
   } while(0)
+
+  if (ctrl == 0)
+    val = format2[(int) val];
 
   ZWO_SET(0, format);
   ZWO_SET(1, flipx);
