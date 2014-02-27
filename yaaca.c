@@ -320,23 +320,25 @@ static void update_ctrl( GtkWidget *w, int n )
 	    autov);
   /* note: it's zwo specific adjustment of ROI centered on the crosshair */
   if (n == 11) {
-    if (resolution == 19) {
+    if (ccam->isbin(cam, resolution) > 1) {
       set_w_int(ctrl_val[9], 0);
       set_w_int(ctrl_val[10], 0);
     }
     else {
       int w,h;
       int osx, osy;
+      int maxw = ccam->maxw(cam);
+      int maxh = ccam->maxh(cam);
 
       ccam->get_pars(cam, &w, &h, NULL, NULL, &osx, &osy);
       sx = cx + osx - w/2;
       if (sx < 0) sx = 0;
-      if (sx + w >= 1280) sx = 1280 - w;
+      if (sx + w >= maxw) sx = maxw - w;
       ccam->set(cam, 9, sx, 0);
       set_w_int(ctrl_val[9], sx);
       sy = cy + osy - h/2;
       if (sy < 0) sy = 0;
-      if (sy + h >= 960) sy = 960 - h;
+      if (sy + h >= maxh) sy = maxh - h;
       ccam->set(cam, 10, sy, 0);
       set_w_int(ctrl_val[10], sy);
     }

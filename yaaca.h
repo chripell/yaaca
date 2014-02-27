@@ -55,6 +55,9 @@ struct yaaca_cam_s {
   void (*pulse) (int dir, int n);
   void (*save) (void *cam);
   void (*load) (void *cam);
+  int (*maxw) (void *cam);
+  int (*maxh) (void *cam);
+  int (*isbin) (void *cam, int res);
 };
 
 #define YAACA_FMT_RAW8 0

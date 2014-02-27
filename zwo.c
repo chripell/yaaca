@@ -36,8 +36,7 @@
 #include "yaaca.h"
 
 static char **resolutions;
-static char *all_resolutions[] = {
-  "10000x10000",
+static char *all_resolutions_asi120[] = {
   "1280X960",
   "1280X720",
   "1280X600",
@@ -59,13 +58,43 @@ static char *all_resolutions[] = {
   "480X320",
   "320X240",
   "2X2Bin:640X480",
+  NULL,
+};
+static char *all_resolutions_asi034[] = {
+  "728x512",
+  "640X480",
+  "480X320",  
+  "320X240",
   "2X2Bin:364x256",
   NULL,
 };
+static char *all_resolutions_asi130[] = {
+  "1280X1024",
+  "1280X600",
+  "1280X400",
+  "800x600",
+  "800x400",
+  "640x480",
+  "600x400",
+  "400x400",
+  "480x320",
+  "320x240",
+  "2X2Bin:640X512",
+  "4X4Bin:320x240",
+  NULL,
+};
+static char *all_resolutions_asi035[] = {
+  "752x480",
+  "640x480",
+  "600x400",
+  "400x400",
+  "320x240",
+  "2x2Bin:376x240",
+  NULL
+};
 
 static int *resolutions_x;
-static int all_resolutions_x[] = {
-  10000,
+static int all_resolutions_x_asi120[] = {
   1280,
   1280,
   1280,
@@ -87,12 +116,39 @@ static int all_resolutions_x[] = {
   480,
   320,
   640,
+};
+static int all_resolutions_x_asi034[] = {
+  728,
+  640,
+  480,
+  320,
   364,
+};
+static int all_resolutions_x_asi130[] = {
+  1280,
+  1280,
+  1280,
+  800,
+  800,
+  640,
+  600,
+  400,
+  480,
+  320,
+  640,
+  320,
+};
+static int all_resolutions_x_asi035[] = {
+  752,
+  640,
+  600,
+  400,
+  320,
+  376,
 };
 
 static int *resolutions_y;
-static int all_resolutions_y[] = {
-  10000,
+static int all_resolutions_y_asi120[] = {
   960,
   720,
   600,
@@ -114,12 +170,39 @@ static int all_resolutions_y[] = {
   320,
   240,
   480,
+};
+static int all_resolutions_y_asi034[] = {
+  512,
+  480,
+  320,
+  240,
   256,
+};
+static int all_resolutions_y_asi130[] = {
+  1024,
+  600,
+  400,
+  600,
+  400,
+  480,
+  400,
+  400,
+  320,
+  240,
+  512,
+  256,
+};
+static int all_resolutions_y_asi035[] = {
+  480,
+  480,
+  400,
+  400,
+  240,
+  240,
 };
 
 static int *resolutions_bin;
-static int all_resolutions_bin[] = {
-  0,
+static int all_resolutions_bin_asi120[] = {
   1,
   1,
   1,
@@ -141,6 +224,34 @@ static int all_resolutions_bin[] = {
   1,
   1,
   2,
+};
+static int all_resolutions_bin_asi034[] = {
+  1,
+  1,
+  1,
+  1,
+  2,
+};
+static int all_resolutions_bin_asi130[] = {
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  2,
+  2,
+};
+static int all_resolutions_bin_asi035[] = {
+  1,
+  1,
+  1,
+  1,
+  1,
   2,
 };
 
@@ -333,13 +444,40 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   *maxw = getMaxWidth();
   *maxh = getMaxHeight();
 
-  i = 0;
-  while (all_resolutions_x[i] > *maxw || all_resolutions_y[i] > *maxh)
-    i++;
-  resolutions = &all_resolutions[i];
-  resolutions_x = &all_resolutions_x[i];
-  resolutions_y = &all_resolutions_y[i];
-  resolutions_bin = &all_resolutions_bin[i];
+  switch(getCameraType(n)) {
+  case CAMERA_ASI034MC:
+    resolutions = all_resolutions_asi034;
+    resolutions_x = all_resolutions_x_asi034;
+    resolutions_y = all_resolutions_y_asi034;
+    resolutions_bin = all_resolutions_bin_asi034;
+    break;
+  case CAMERA_ASI130MM:
+    resolutions = all_resolutions_asi130;
+    resolutions_x = all_resolutions_x_asi130;
+    resolutions_y = all_resolutions_y_asi130;
+    resolutions_bin = all_resolutions_bin_asi130;
+    break;
+  case CAMERA_ASI035MM:
+  case CAMERA_ASI035MC:
+    resolutions = all_resolutions_asi035;
+    resolutions_x = all_resolutions_x_asi035;
+    resolutions_y = all_resolutions_y_asi035;
+    resolutions_bin = all_resolutions_bin_asi035;
+    break;
+  default:
+    resolutions = all_resolutions_asi120;
+    resolutions_x = all_resolutions_x_asi120;
+    resolutions_y = all_resolutions_y_asi120;
+    resolutions_bin = all_resolutions_bin_asi120;
+    break;
+  }
+
+  while (*resolutions_x > *maxw || *resolutions_y > *maxh) {
+    resolutions++;
+    resolutions_x++;
+    resolutions_y++;
+    resolutions_bin++;
+  }
   while (resolutions[resolutions_n])
     resolutions_n++;
 
@@ -602,6 +740,21 @@ static void zwo_save(void *cam)
   }
 }
 
+static int zwo_maxw(void *cam)
+{
+  return getMaxWidth();
+}
+
+static int zwo_maxh(void *cam)
+{
+  return getMaxHeight();
+}
+
+static int zwo_isbin(void *cam, int res)
+{
+  return resolutions_bin[res];
+}
+
 struct yaaca_cam_s ZWO_CAM = {
   "ZWO Asi Camera",
   zwo_cam_init,
@@ -614,4 +767,7 @@ struct yaaca_cam_s ZWO_CAM = {
   zwo_pulse,
   zwo_save,
   zwo_load,
+  zwo_maxw,
+  zwo_maxh,
+  zwo_isbin,
 };
