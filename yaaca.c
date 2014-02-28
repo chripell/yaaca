@@ -69,7 +69,7 @@ static char capture_path[MAX_PATH];
 static int do_capture;
 static int capture_raw, capture_compress, capture_blind;
 
-static int gain, exposure, format, resolution;
+static int gain, exposure, format, resolution, start_x, start_y;
 
 static float fps;
 static struct timeval last_fps_comp;
@@ -312,6 +312,12 @@ static void update_ctrl( GtkWidget *w, int n )
   case 11:
     resolution = val;
     break;
+  case 9:
+    start_x = val;
+    break;
+  case 10:
+    start_y = val;
+    break;
   }
   cx = cross_x;
   cy = cross_y;
@@ -322,7 +328,9 @@ static void update_ctrl( GtkWidget *w, int n )
   if (n == 11) {
     if (ccam->isbin(cam, resolution) > 1) {
       set_w_int(ctrl_val[9], 0);
+      start_x = 0;
       set_w_int(ctrl_val[10], 0);
+      start_y = 0;
     }
     else {
       int w,h;
@@ -336,11 +344,13 @@ static void update_ctrl( GtkWidget *w, int n )
       if (sx + w >= maxw) sx = maxw - w;
       ccam->set(cam, 9, sx, 0);
       set_w_int(ctrl_val[9], sx);
+      start_x = sx;
       sy = cy + osy - h/2;
       if (sy < 0) sy = 0;
       if (sy + h >= maxh) sy = maxh - h;
       ccam->set(cam, 10, sy, 0);
       set_w_int(ctrl_val[10], sy);
+      start_y = sy;
     }
   }
 }
@@ -959,6 +969,8 @@ int main(int argc, char *argv[])
   gain = ctrls[12].def_auto ? 0 : ctrls[12].def;
   exposure = ctrls[13].def_auto ? 0 : ctrls[13].def;
   resolution = ctrls[11].def;
+  start_x = ctrls[9].def;
+  start_y = ctrls[10].def;
 
   capture_box = gtk_vbox_new (FALSE, 0);
   gtk_box_pack_start(GTK_BOX (right), capture_box, FALSE, FALSE, 1);
@@ -1068,7 +1080,8 @@ int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
     if (capture_raw) {
       FILE *f;
 
-      snprintf(fname, MAX_PATH, "%s/%010ld_%06ld_%d_%d_%d.%s", capture_path, tv.tv_sec, tv.tv_usec, format, gain, exposure,
+      snprintf(fname, MAX_PATH, "%s/%010ld_%06ld_%d_%d_%d_%d_%d.%s",
+	       capture_path, tv.tv_sec, tv.tv_usec, format, gain, exposure, start_x, start_y,
 	       format == YAACA_FMT_RGB24 ? "ppm" : "pgm");
       f = fopen(fname, "w");
       if (f) {
@@ -1081,7 +1094,7 @@ int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
       }
     }
     else {
-      snprintf(fname, MAX_PATH, "%s/%010ld_%06ld_%d_%d_%d.png", capture_path, tv.tv_sec, tv.tv_usec, format, gain, exposure);
+      snprintf(fname, MAX_PATH, "%s/%010ld_%06ld_%d_%d_%d_%d_%d.png", capture_path, tv.tv_sec, tv.tv_usec, format, gain, exposure, start_x, start_y);
       writeImage(fname, w, h, format == YAACA_FMT_RAW16 ? 16 : 8, format == YAACA_FMT_RGB24, data, capture_compress);
     }
     //fprintf(stderr, "written %s\n", fname);
