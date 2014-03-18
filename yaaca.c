@@ -74,6 +74,7 @@ static int gain, exposure, format, resolution, start_x, start_y;
 static float fps;
 static struct timeval last_fps_comp;
 static int fps_n;
+static float temp;
 
 int writeImage(const char* filename, int width, int height, int bpp, int color, unsigned char *buffer, int compress)
 {
@@ -389,7 +390,8 @@ static gboolean redraw_fps(gpointer user_data)
 {
   char stat[200];
 
-  snprintf(stat, 200, "T: %.1f, Dropped: %.0f FPS: %.2f", ccam->get(cam, 3), ccam->get(cam, 4), fps);
+  temp = ccam->get(cam, 3);
+  snprintf(stat, 200, "T: %.1f, Dropped: %.0f FPS: %.2f", temp, ccam->get(cam, 4), fps);
   gtk_label_set_text(GTK_LABEL(status2), stat);
   return FALSE;
 }
@@ -1080,8 +1082,8 @@ int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
     if (capture_raw) {
       FILE *f;
 
-      snprintf(fname, MAX_PATH, "%s/%010ld_%06ld_%d_%d_%d_%d_%d.%s",
-	       capture_path, tv.tv_sec, tv.tv_usec, format, gain, exposure, start_x, start_y,
+      snprintf(fname, MAX_PATH, "%s/%010ld_%06ld_%d_%d_%d_%d_%d_%d.%s",
+	       capture_path, tv.tv_sec, tv.tv_usec, format, gain, exposure, start_x, start_y, (int) temp,
 	       format == YAACA_FMT_RGB24 ? "ppm" : "pgm");
       f = fopen(fname, "w");
       if (f) {
@@ -1094,7 +1096,7 @@ int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
       }
     }
     else {
-      snprintf(fname, MAX_PATH, "%s/%010ld_%06ld_%d_%d_%d_%d_%d.png", capture_path, tv.tv_sec, tv.tv_usec, format, gain, exposure, start_x, start_y);
+      snprintf(fname, MAX_PATH, "%s/%010ld_%06ld_%d_%d_%d_%d_%d_%d.png", capture_path, tv.tv_sec, tv.tv_usec, format, gain, exposure, start_x, start_y, (int) temp);
       writeImage(fname, w, h, format == YAACA_FMT_RAW16 ? 16 : 8, format == YAACA_FMT_RGB24, data, capture_compress);
     }
     //fprintf(stderr, "written %s\n", fname);
