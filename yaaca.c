@@ -288,7 +288,7 @@ static void update_ctrl( GtkWidget *w, int n )
 {
   int autov = 0;
   double val = 0;
-  int cx, cy;
+  int cx = 0, cy = 0;
   int sx = 0, sy = 0;
 
   if (ctrls[n].flags & YAACA_AUTO) {
@@ -300,58 +300,62 @@ static void update_ctrl( GtkWidget *w, int n )
   else {
     val = atof(gtk_entry_get_text(GTK_ENTRY(ctrl_val[n])));
   }
-  switch(n) {			/* note: it's specific to zwo */
-  case 0:
-    format = val;
-    break;
-  case 12:
-    gain = autov ? 0: val;
-    break;
-  case 13:
-    exposure = autov ? 0 : val;
-    break;
-  case 11:
-    resolution = val;
-    break;
-  case 9:
-    start_x = val;
-    break;
-  case 10:
-    start_y = val;
-    break;
+  if (!strcmp(ccam->name, "ZWO Asi Camera")) {
+    switch(n) {
+    case 0:
+      format = val;
+      break;
+    case 12:
+      gain = autov ? 0: val;
+      break;
+    case 13:
+      exposure = autov ? 0 : val;
+      break;
+    case 11:
+      resolution = val;
+      break;
+    case 9:
+      start_x = val;
+      break;
+    case 10:
+      start_y = val;
+      break;
+    }
+    cx = cross_x;
+    cy = cross_y;
   }
-  cx = cross_x;
-  cy = cross_y;
   ccam->set(cam, n,
 	    val,
 	    autov);
-  /* note: it's zwo specific adjustment of ROI centered on the crosshair */
-  if (n == 11) {
-    if (ccam->isbin(cam, resolution) > 1) {
-      set_w_int(ctrl_val[9], 0);
-      start_x = 0;
-      set_w_int(ctrl_val[10], 0);
-      start_y = 0;
-    }
-    else {
-      int w,h;
-      int osx, osy;
-      int maxw = ccam->maxw(cam);
-      int maxh = ccam->maxh(cam);
+  if (!strcmp(ccam->name, "ZWO Asi Camera")) {
+    /* adjustment of ROI centered on the crosshair */
+    if (n == 11) {
+      if (ccam->isbin(cam, resolution) > 1) {
+	set_w_int(ctrl_val[9], 0);
+	start_x = 0;
+	set_w_int(ctrl_val[10], 0);
+	start_y = 0;
+      }
+      else {
+	int w,h;
+	int osx, osy;
+	int maxw = ccam->maxw(cam);
+	int maxh = ccam->maxh(cam);
 
-      ccam->get_pars(cam, &w, &h, NULL, NULL, &osx, &osy);
-      sx = cx + osx - w/2;
-      if (sx < 0) sx = 0;
-      if (sx + w >= maxw) sx = maxw - w;
-      ccam->set(cam, 9, sx, 0);
-      set_w_int(ctrl_val[9], sx);
-      start_x = sx;
-      sy = cy + osy - h/2;
-      if (sy < 0) sy = 0;
-      if (sy + h >= maxh) sy = maxh - h;
-      ccam->set(cam, 10, sy, 0);
-      set_w_int(ctrl_val[10], sy);
-      start_y = sy;
+	ccam->get_pars(cam, &w, &h, NULL, NULL, &osx, &osy);
+	sx = cx + osx - w/2;
+	if (sx < 0) sx = 0;
+	if (sx + w >= maxw) sx = maxw - w;
+	ccam->set(cam, 9, sx, 0);
+	set_w_int(ctrl_val[9], sx);
+	start_x = sx;
+	sy = cy + osy - h/2;
+	if (sy < 0) sy = 0;
+	if (sy + h >= maxh) sy = maxh - h;
+	ccam->set(cam, 10, sy, 0);
+	set_w_int(ctrl_val[10], sy);
+	start_y = sy;
+      }
     }
   }
 }
@@ -841,7 +845,7 @@ static GtkWidget *create_button(char *c, int w, int h, GCallback cb)
 
 int main(int argc, char *argv[])
 {
-  int n_ctrls;
+  int n_ctrls, i;
   int maxw, maxh;
   GtkWidget *window, *top_pane, *scrolled_window,
     *scrolled_window1, *right, *status1;
@@ -918,61 +922,63 @@ int main(int argc, char *argv[])
   ctrl_val = calloc(n_ctrls, sizeof(GtkWidget *));
   ctrl_auto = calloc(n_ctrls, sizeof(GtkWidget *));
 
-#if 1
+  if (!strcmp(ccam->name, "ZWO Asi Camera")) {
 #define ADD(B, i) gtk_box_pack_start(GTK_BOX (B), create_ctrl(&ctrls[i], i, &ctrl_val[i], &ctrl_auto[i]), B==box, B==box, B==box ? 0 : 1)
 
-  box = gtk_hbox_new (FALSE, 0);
-  gtk_widget_show (box);
-  ADD(box, 0);
-  ADD(box, 1);
-  ADD(box, 2);
-  gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 1);
+    box = gtk_hbox_new (FALSE, 0);
+    gtk_widget_show (box);
+    ADD(box, 0);
+    ADD(box, 1);
+    ADD(box, 2);
+    gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 1);
 
-  box = gtk_hbox_new (FALSE, 0);
-  gtk_widget_show (box);
-  ADD(box, 9);
-  ADD(box, 10);
-  gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 1);
+    box = gtk_hbox_new (FALSE, 0);
+    gtk_widget_show (box);
+    ADD(box, 9);
+    ADD(box, 10);
+    gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 1);
   
-  ADD(right, 11);
-  ADD(right, 13);
+    ADD(right, 11);
+    ADD(right, 13);
 
-  box = gtk_hbox_new (FALSE, 0);
-  gtk_widget_show (box);
-  ADD(box, 12);
-  ADD(box, 14);
-  gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 1);
+    box = gtk_hbox_new (FALSE, 0);
+    gtk_widget_show (box);
+    ADD(box, 12);
+    ADD(box, 14);
+    gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 1);
 
-  box = gtk_hbox_new (FALSE, 0);
-  gtk_widget_show (box);
-  ADD(box, 15);
-  ADD(box, 16);
-  gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 1);
+    box = gtk_hbox_new (FALSE, 0);
+    gtk_widget_show (box);
+    ADD(box, 15);
+    ADD(box, 16);
+    gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 1);
 
-  box = gtk_hbox_new (FALSE, 0);
-  gtk_widget_show (box);
-  ADD(box, 17);
-  ADD(box, 18);
-  gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 1);
+    box = gtk_hbox_new (FALSE, 0);
+    gtk_widget_show (box);
+    ADD(box, 17);
+    ADD(box, 18);
+    gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 1);
 
 #undef ADD
-#else
-  for(i = 0; i < n_ctrls; i++) {
-    if ((ctrls[i].flags & (YAACA_OFF | YAACA_RO)) == 0) {
-      GtkWidget *box = create_ctrl(&ctrls[i], i, &ctrl_val[i], &ctrl_auto[i]);
+  }
+  else {
+    for(i = 0; i < n_ctrls; i++) {
+      if ((ctrls[i].flags & (YAACA_OFF | YAACA_RO)) == 0) {
+	GtkWidget *box = create_ctrl(&ctrls[i], i, &ctrl_val[i], &ctrl_auto[i]);
 
-      gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 0);
+	gtk_box_pack_start(GTK_BOX (right), box, FALSE, FALSE, 0);
+      }
     }
   }
-#endif
 
-  /* zwo specific */
-  format = ctrls[0].def;
-  gain = ctrls[12].def_auto ? 0 : ctrls[12].def;
-  exposure = ctrls[13].def_auto ? 0 : ctrls[13].def;
-  resolution = ctrls[11].def;
-  start_x = ctrls[9].def;
-  start_y = ctrls[10].def;
+  if (!strcmp(ccam->name, "ZWO Asi Camera")) {
+    format = ctrls[0].def;
+    gain = ctrls[12].def_auto ? 0 : ctrls[12].def;
+    exposure = ctrls[13].def_auto ? 0 : ctrls[13].def;
+    resolution = ctrls[11].def;
+    start_x = ctrls[9].def;
+    start_y = ctrls[10].def;
+  }
 
   capture_box = gtk_vbox_new (FALSE, 0);
   gtk_box_pack_start(GTK_BOX (right), capture_box, FALSE, FALSE, 1);
