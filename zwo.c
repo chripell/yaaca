@@ -690,8 +690,14 @@ static void zwo_load(void *cam)
     }
     c[11].def = reso;
     zwo_set(z, 11, reso, 0);
-    c[0].def = m;
-    zwo_set(z, 0, m, 0);
+    c[0].def = 0;
+    for (i = 0; i < n_formats; i++) {
+      if (format2[i] == m) {
+	c[0].def = i;
+	break;
+      }
+    }
+    zwo_set(z, 0, c[0].def, 0);
     setImageFormat(w, h, b, m);
     for(i = 0; i < 7; i++) {
       int v, a;
