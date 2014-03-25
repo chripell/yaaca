@@ -18,6 +18,9 @@ struct cmd_s {
 
 struct asill_s {
   libusb_device_handle *h;
+  pthread_t th;
+  volatile int running;
+  unsigned char *d;
 
   struct cmd_s *cmds;
   size_t max_cmds;
@@ -29,19 +32,34 @@ struct asill_s {
   volatile int data_ready;
   asill_new_frame_f cb;
 
-  int max_width;
-  int max_height;
-  int width;
-  int height;
-  int digital_gain;
-  int digital_gain_R;
-  int digital_gain_G1;
-  int digital_gain_G2;
-  int digital_gain_B;
+  uint16_t max_width;
+  uint16_t max_height;
+  uint16_t width;
+  uint16_t height;
+  uint16_t start_x;
+  uint16_t start_y;
+
+  uint16_t digital_gain;
+  uint16_t digital_gain_R;
+  uint16_t digital_gain_G1;
+  uint16_t digital_gain_G2;
+  uint16_t digital_gain_B;
+
+  uint32_t pclk;
+  uint32_t exposure_us;
+  uint16_t M_pll_mul;
+  uint16_t N_pre_pll_div;
+  uint16_t P1_sys_div;
+  uint16_t P2_pix_div;
 };
 
 static libusb_context *ctx;
 static pthread_mutex_t lk = PTHREAD_MUTEX_INITIALIZER; 
+
+const uint16_t M_PLL_mul[] =  { 32, 40, 40, 48, 32, 32, };
+const uint16_t N_pre_div[] =  { 4,   3,  5,  6,  4,  4, };
+const uint16_t P1_sys_div[] = { 4,   4,  2,  1, 12, 24, };
+const uint16_t P2_clk_div[] = { 4,   4,  4,  4,  4,  8, };
 
 static struct cmd_s *scmd(struct asill_s *A)
 {
@@ -116,6 +134,51 @@ static int get_reg(struct asill_s *A, int r)
 {
   assert(r >= 0x3000 && r < 0x3200);
   return A->shadow[r - 0x3000];
+}
+
+static void setup_frame(struct asill_s *A)
+{
+#define MAX_COARSE 0x8000
+  uint16_t tot_w = A->width + 460;
+  uint16_t tot_h = A->height + 26;
+  uint16_t coarse;
+  double pclk = 48000000.0 * M_PLL_mul[A->pclk] / (N_pre_div[A->pclk] * P1_sys_div[A->pclk] * P2_clk_div[A->pclk]);
+  double line_us = tot_w / pclk;
+
+  while( (coarse = A->exp_us / line_us) > MAX_COARSE) {
+    tot_w *= 2;
+    line_us = tot_w / pclk;
+  }
+  
+  set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
+  set_reg(A, MT9M034_RESET_REGISTER, 0x10da);
+  sleep_ms(A, 101);
+  set_reg(A, MT9M034_VT_PIX_CLK_DIV, P2_clk_div[A->pclk]);
+  set_reg(A, MT9M034_VT_SYS_CLK_DIV, P1_sys_div[A->pclk]);
+  set_reg(A, MT9M034_PRE_PLL_CLK_DIV, N_pre_div[A->pclk]);
+  set_reg(A, MT9M034_PLL_MULTIPLIER, M_PLL_mul[A->pclk]);
+  sleep_ms(A, 11);
+  set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
+  sleep_ms(A, 201);
+  send_ctrl(A, 0xac);
+  set_reg(A, MT9M034_DIGITAL_BINNING, 0x0000);
+  set_reg(A, MT9M034_Y_ADDR_START, 0x0002 + A->start_y);
+  set_reg(A, MT9M034_X_ADDR_START, A->start_x);
+  set_reg(A, MT9M034_FRAME_LENGTH_LINES, tot_h);
+  set_reg(A, MT9M034_Y_ADDR_END, 0x0002 + A->start_y + A->height -1);
+  set_reg(A, MT9M034_X_ADDR_END, A->start_x + A->width - 1);
+  set_reg(A, MT9M034_DIGITAL_BINNING, 0x0000);
+  set_reg(A, 0x306e, 0x9200);
+  set_reg(A, MT9M034_LINE_LENGTH_PCK, tot_w);
+  set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
+  set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
+  set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
+  set_reg(A, MT9M034_COLUMN_CORRECTION, 0x0000);
+  set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
+  sleep_ms(A, 51);
+  set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
+  set_reg(A, MT9M034_COLUMN_CORRECTION, 0xe007);
+  set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
 }
 
 static void init(struct asill_s *A)
@@ -248,6 +311,15 @@ static void init(struct asill_s *A)
   set_reg(A, MT9M034_LINE_LENGTH_PCK, 0x056e);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, 0x0473);
 
+#if 1
+  A->width = 1280;
+  A->height = 960;
+  A->pclk = ASILL_PCLK_25MHZ;
+  A->exposure_us = 10000;
+  A->start_x = 0;
+  A->start_y = 0;
+  setup_frame(A);
+#else
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, 0x01bc);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10da);
   sleep_ms(A, 101);
@@ -277,14 +349,46 @@ static void init(struct asill_s *A)
   set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
   set_reg(A, MT9M034_COLUMN_CORRECTION, 0xe007);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
+#endif
 
+  /* unity gain */
   set_reg(MT9M034_RED_GAIN, 0x0020);
   set_reg(MT9M034_BLUE_GAIN, 0x0020);
   set_reg(MT9M034_GREEN1_GAIN, 0x0020);
   set_reg(MT9M034_GREEN2_GAIN, 0x0020);
   set_reg(MT9M034_GLOBAL_GAIN, 0x0020);
 
+  /* start capture */
+  send_ctrl(0xaa);
+  send_ctrl(0xaf);
+  sleep_ms(100);
+  send_ctrl(0xa9);
+
   pthread_mutex_unlock(&A->cmd_lock);
+}
+
+static void *worker(void *A_)
+{
+  struct asill_s *A = (struct asill_s *) A_;
+
+  while (A->running) {
+    int transfered, ret;
+
+    run_q(A);
+    if ((ret = libusb_bulk_transfer(dh, 0x82, A->d, A->width * A->height * 2, &transfered, 1000)) == 0) {
+      if (A->data && !A->data_ready) {
+	memcpy(A->data, A->d, A->width * A->height * 2);
+	A->data_ready = 1;
+      }
+      if (A->cb) {
+	A->cb(A->d, A->width, A->height);
+      }
+    }
+    else {
+      fprintf(stderr, "bulk transfer failed: %d\n", ret);
+    }
+  }
+  return NULL;
 }
 
 struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame_f cb)
@@ -352,7 +456,10 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
     if (has_buffer) {
       A->data = malloc(A->max_width * A->max_height * 2);
     }
+    A->d = malloc(A->max_width * A->max_height * 2);
     run_q(A);
+    A->running = 1;
+    assert(pthread_create(&A->th, NULL, worker, A) == 0);
   }
 
  asil_new_exit:
