@@ -34,9 +34,9 @@
 #endif
 
 static struct yaaca_ctrl *ctrls;
-/* TODO: support more cameras and get type from command line */
 extern struct yaaca_cam_s ZWO_CAM;
-struct yaaca_cam_s *ccam = &ZWO_CAM;
+extern struct yaaca_cam_s ZWO_CAMLL;
+struct yaaca_cam_s *ccam;
 static void * cam;
 
 static GtkWidget **ctrl_val;
@@ -300,7 +300,7 @@ static void update_ctrl( GtkWidget *w, int n )
   else {
     val = atof(gtk_entry_get_text(GTK_ENTRY(ctrl_val[n])));
   }
-  if (!strcmp(ccam->name, "ZWO Asi Camera")) {
+  if (ccam == &ZWO_CAM) {
     switch(n) {
     case 0:
       format = val;
@@ -327,7 +327,7 @@ static void update_ctrl( GtkWidget *w, int n )
   ccam->set(cam, n,
 	    val,
 	    autov);
-  if (!strcmp(ccam->name, "ZWO Asi Camera")) {
+  if (ccam == &ZWO_CAM) {
     /* adjustment of ROI centered on the crosshair */
     if (n == 11) {
       if (ccam->isbin(cam, resolution) > 1) {
@@ -416,7 +416,6 @@ static gboolean redraw_image(gpointer user_data)
     hmin = atoi(gtk_entry_get_text(GTK_ENTRY(histo_min)));
     hmax = atoi(gtk_entry_get_text(GTK_ENTRY(histo_max)));
 
-    //fprintf(stderr, "DRAW %d %d\n", cimg_format, YAACA_FMT_RGB24);
     setup_im(cimg_w, cimg_h);
     o = gdk_pixbuf_get_pixels(imb);
     if (cimg_format == YAACA_FMT_RGB24) {
@@ -843,6 +842,26 @@ static GtkWidget *create_button(char *c, int w, int h, GCallback cb)
   return b;
 }
 
+static gboolean zwo_ll_timer(gpointer priv)
+{
+  unsigned char *b = ccam->get_buffer(cam, 0);
+
+  if (b) {
+    cimg_present = 1;
+    cimg_w = 1280;
+    cimg_h = 960;
+    cimg_format = YAACA_FMT_RAW16;
+    cimg_bpp = 16;
+    cimg = b;
+    redraw_image(NULL);
+    ccam->get_buffer(cam, 1);
+  }
+  else {
+    cimg_present = 0;
+  }
+  return TRUE;
+}
+
 int main(int argc, char *argv[])
 {
   int n_ctrls, i;
@@ -854,12 +873,26 @@ int main(int argc, char *argv[])
   GtkWidget *pulse_table;
   GtkWidget *cross_box, *zoom_box;
   GtkWidget *histo_box, *histo1_box;
+  int n_cam;
 
   g_thread_init (NULL);
   gtk_init (&argc, &argv);
 
-  cam = ccam->init(getenv("YAACA_CAM") ? atoi(getenv("YAACA_CAM")) : 0,
-		   &ctrls, &n_ctrls, &maxw, &maxh);
+  n_cam = getenv("YAACA_CAM") ? atoi(getenv("YAACA_CAM")) : 0;
+  if (getenv("YAACA_LL_ASI120MM")) {
+    ccam = &ZWO_CAMLL;
+    cam = ccam->init(n_cam, &ctrls, &n_ctrls, &maxw, &maxh);
+  }
+  else if (getenv("YAACA_LL_ASI120MC")) {
+    ccam = &ZWO_CAMLL;
+    cam = ccam->init(n_cam + 10, &ctrls, &n_ctrls, &maxw, &maxh);
+  }
+  else {
+    ccam = &ZWO_CAM;
+    cam = ccam->init(getenv("YAACA_CAM") ? atoi(getenv("YAACA_CAM")) : 0,
+		     &ctrls, &n_ctrls, &maxw, &maxh);
+  }
+
   if (!cam) {
     fprintf(stderr, "CAM not found!\n");
     exit(1);
@@ -922,7 +955,7 @@ int main(int argc, char *argv[])
   ctrl_val = calloc(n_ctrls, sizeof(GtkWidget *));
   ctrl_auto = calloc(n_ctrls, sizeof(GtkWidget *));
 
-  if (!strcmp(ccam->name, "ZWO Asi Camera")) {
+  if (ccam == &ZWO_CAM) {
 #define ADD(B, i) gtk_box_pack_start(GTK_BOX (B), create_ctrl(&ctrls[i], i, &ctrl_val[i], &ctrl_auto[i]), B==box, B==box, B==box ? 0 : 1)
 
     box = gtk_hbox_new (FALSE, 0);
@@ -971,7 +1004,7 @@ int main(int argc, char *argv[])
     }
   }
 
-  if (!strcmp(ccam->name, "ZWO Asi Camera")) {
+  if (ccam == &ZWO_CAM) {
     format = ctrls[0].def;
     gain = ctrls[12].def_auto ? 0 : ctrls[12].def;
     exposure = ctrls[13].def_auto ? 0 : ctrls[13].def;
@@ -1038,6 +1071,9 @@ int main(int argc, char *argv[])
 
   gtk_widget_show (window);
   ccam->run(cam, 1);
+  if (ccam == &ZWO_CAMLL) {
+    g_timeout_add(100, zwo_ll_timer, NULL);
+  }
   gtk_main ();
   ccam->save(cam);
   return 0;

@@ -25,4 +25,7 @@ int asill_set_wh(struct asill_s *A, uint16_t w, uint16_t h);
 uint16_t asill_get_w(struct asill_s *A);
 uint16_t asill_get_h(struct asill_s *A);
 
+uint8_t *asill_get_buffer(struct asill_s *A);
+void asill_done_buffer(struct asill_s *A);
+
 #endif

@@ -18,6 +18,8 @@
 #ifndef _YAACA_H_
 #define _YAACA_H_ 1
 
+#include <stdint.h>
+
 #define YAACA_MAX_NAME 100
 
 #define YAACA_REAL 1
@@ -58,6 +60,7 @@ struct yaaca_cam_s {
   int (*maxw) (void *cam);
   int (*maxh) (void *cam);
   int (*isbin) (void *cam, int res);
+  uint8_t * (*get_buffer) (void *cam, int done);
 };
 
 #define YAACA_FMT_RAW8 0

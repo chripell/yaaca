@@ -1,9 +1,17 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include <libusb.h>
 
 #include "asill.h"
 #include "registers.h"
+
+#define pr_debug(x...) if (do_debug) fprintf(stderr, x)
 
 #define MAX_CMDS 200
 #define CMD_SLEEP_MS 0
@@ -20,7 +28,7 @@ struct asill_s {
   libusb_device_handle *h;
   pthread_t th;
   volatile int running;
-  unsigned char *d;
+  uint8_t *d;
 
   struct cmd_s *cmds;
   size_t max_cmds;
@@ -28,7 +36,7 @@ struct asill_s {
   pthread_mutex_t cmd_lock;
   uint16_t shadow[0x200];
 
-  unsigned char *data;
+  uint8_t *data;
   volatile int data_ready;
   asill_new_frame_f cb;
 
@@ -53,13 +61,15 @@ struct asill_s {
   uint16_t P2_pix_div;
 };
 
+static int do_debug;
+
 static libusb_context *ctx;
 static pthread_mutex_t lk = PTHREAD_MUTEX_INITIALIZER; 
 
-const uint16_t M_PLL_mul[] =  { 32, 40, 40, 48, 32, 32, };
-const uint16_t N_pre_div[] =  { 4,   3,  5,  6,  4,  4, };
-const uint16_t P1_sys_div[] = { 4,   4,  2,  1, 12, 24, };
-const uint16_t P2_clk_div[] = { 4,   4,  4,  4,  4,  8, };
+const uint16_t M_PLL_mul[] =  { 32, 40, 40, 48, 32, 32};
+const uint16_t N_pre_div[] =  { 4,   6,  5,  6,  4,  4};
+const uint16_t P1_sys_div[] = { 4,   2,  2,  1, 12, 24};
+const uint16_t P2_clk_div[] = { 4,   4,  4,  4,  4,  8};
 
 static struct cmd_s *scmd(struct asill_s *A)
 {
@@ -83,6 +93,7 @@ static void send_ctrl(struct asill_s *A, int v)
 {
   struct cmd_s *c;
 
+  pr_debug("%s 0x%04x\n", __FUNCTION__, v);
   c = scmd(A);
   c->cmd = CMD_SEND;
   c->p1 = v;
@@ -92,12 +103,13 @@ static void set_reg(struct asill_s *A, int r, int v)
 {
   struct cmd_s *c;
 
-  assert(r >= 0x3000 && r < 0x3200);
+  pr_debug("%s 0x%04x=0x%04x\n", __FUNCTION__, r, v);
   c = scmd(A);
   c->cmd = CMD_SET_REG;
   c->p1 = r;
   c->p2 = v;
-  A->shadow[r - 0x3000] = v;
+  if (r >= 0x3000 && r < 0x3200)
+    A->shadow[r - 0x3000] = v;
 }
 
 static void run_q(struct asill_s *A)
@@ -105,7 +117,7 @@ static void run_q(struct asill_s *A)
   int i;
 
   pthread_mutex_lock(&A->cmd_lock);
-  for(i = 0; i < A->ncmds; i++) {
+  for(i = 0; i < A->n_cmds; i++) {
     struct cmd_s *c = &A->cmds[i];
     int ret = 0;
     
@@ -117,7 +129,7 @@ static void run_q(struct asill_s *A)
       ret = libusb_control_transfer(A->h, 0x40, 0xa6, c->p1, c->p2, NULL, 0, 1000);
       break;
     case CMD_SEND:
-      ret = libusb_control_transfer(dh, 0x40, c->p1 & 0xff, 0, 0, NULL, 0, 1000);
+      ret = libusb_control_transfer(A->h, 0x40, c->p1 & 0xff, 0, 0, NULL, 0, 1000);
       break;
     default:
       assert(0);
@@ -126,29 +138,35 @@ static void run_q(struct asill_s *A)
       fprintf(stderr, "control transfer failed: %s(%d)\n", libusb_error_name(ret), ret);
     }
   }
-  A->ncmds = 0;
+  A->n_cmds = 0;
   pthread_mutex_unlock(&A->cmd_lock);
 }
 
 static int get_reg(struct asill_s *A, int r)
 {
-  assert(r >= 0x3000 && r < 0x3200);
-  return A->shadow[r - 0x3000];
+  if (r >= 0x3000 && r < 0x3200)
+    return A->shadow[r - 0x3000];
+  return 0;
 }
 
 static void setup_frame(struct asill_s *A)
 {
 #define MAX_COARSE 0x8000
-  uint16_t tot_w = A->width + 460;
+  uint16_t tot_w = A->width + 200;
   uint16_t tot_h = A->height + 26;
   uint16_t coarse;
   double pclk = 48000000.0 * M_PLL_mul[A->pclk] / (N_pre_div[A->pclk] * P1_sys_div[A->pclk] * P2_clk_div[A->pclk]);
-  double line_us = tot_w / pclk;
+  double line_us = (tot_w / pclk) * 1000000.0;
 
-  while( (coarse = A->exp_us / line_us) > MAX_COARSE) {
+  pr_debug("%s pclk %f exp %u line_us %f\n", __FUNCTION__, pclk, A->exposure_us, line_us);
+
+  while( (coarse = A->exposure_us / line_us) > MAX_COARSE) {
     tot_w *= 2;
-    line_us = tot_w / pclk;
+    line_us = (tot_w / pclk) * 1000000.0;
+    pr_debug("%s tot_w %d coarse %d line_us %f\n", __FUNCTION__, tot_w, coarse, line_us);
   }
+  pr_debug("%s finale: tot_w %d coarse %d line_us %f\n", __FUNCTION__, tot_w, coarse, line_us);
+  pr_debug("%s real exp us: %f\n", __FUNCTION__, coarse * line_us);
   
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10da);
@@ -314,7 +332,7 @@ static void init(struct asill_s *A)
 #if 1
   A->width = 1280;
   A->height = 960;
-  A->pclk = ASILL_PCLK_25MHZ;
+  A->pclk = ASILL_PCLK_40MHZ;
   A->exposure_us = 10000;
   A->start_x = 0;
   A->start_y = 0;
@@ -352,17 +370,17 @@ static void init(struct asill_s *A)
 #endif
 
   /* unity gain */
-  set_reg(MT9M034_RED_GAIN, 0x0020);
-  set_reg(MT9M034_BLUE_GAIN, 0x0020);
-  set_reg(MT9M034_GREEN1_GAIN, 0x0020);
-  set_reg(MT9M034_GREEN2_GAIN, 0x0020);
-  set_reg(MT9M034_GLOBAL_GAIN, 0x0020);
+  set_reg(A, MT9M034_RED_GAIN, 0x0020);
+  set_reg(A, MT9M034_BLUE_GAIN, 0x0020);
+  set_reg(A, MT9M034_GREEN1_GAIN, 0x0020);
+  set_reg(A, MT9M034_GREEN2_GAIN, 0x0020);
+  set_reg(A, MT9M034_GLOBAL_GAIN, 0x0020);
 
   /* start capture */
-  send_ctrl(0xaa);
-  send_ctrl(0xaf);
-  sleep_ms(100);
-  send_ctrl(0xa9);
+  send_ctrl(A, 0xaa);
+  send_ctrl(A, 0xaf);
+  sleep_ms(A, 100);
+  send_ctrl(A, 0xa9);
 
   pthread_mutex_unlock(&A->cmd_lock);
 }
@@ -375,7 +393,7 @@ static void *worker(void *A_)
     int transfered, ret;
 
     run_q(A);
-    if ((ret = libusb_bulk_transfer(dh, 0x82, A->d, A->width * A->height * 2, &transfered, 1000)) == 0) {
+    if ((ret = libusb_bulk_transfer(A->h, 0x82, A->d, A->width * A->height * 2, &transfered, 1000)) == 0) {
       if (A->data && !A->data_ready) {
 	memcpy(A->data, A->d, A->width * A->height * 2);
 	A->data_ready = 1;
@@ -398,9 +416,12 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
   ssize_t i, cnt;
   struct asill_s *A = NULL;
 
+  if (getenv("ASILL_DEBUG"))
+    do_debug = 1;
+
   pthread_mutex_lock(&lk);
   if (!ctx) {
-    if (!(ret = libusb_init(&ctx))) {
+    if ((ret = libusb_init(&ctx))) {
       ctx = NULL;
       fprintf(stderr, "libusb_init failed: %s(%d)\n", libusb_error_name(ret), ret);
       A = NULL;
@@ -418,12 +439,12 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
     struct libusb_device_descriptor desc;
     int ret;
     
-    ret = libusb_get_device_descriptor( dev, &desc );
+    ret = libusb_get_device_descriptor(device, &desc);
     if (!ret) {
       if (desc.idVendor == 0x03c3 && desc.idProduct == model) {
 	if (n == j) {
 	  A = calloc(1, sizeof(*A));
-	  ret = libusb_open(device, &A.h);
+	  ret = libusb_open(device, &A->h);
 	  if (ret) {
 	    fprintf(stderr, "libusb_open failed: %s(%d)\n", libusb_error_name(ret), ret);
 	    free(A);
@@ -462,9 +483,20 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
     assert(pthread_create(&A->th, NULL, worker, A) == 0);
   }
 
- asil_new_exit:
+ asill_new_exit:
   pthread_mutex_unlock(&lk);  
   return A;
 }
 
+uint8_t *asill_get_buffer(struct asill_s *A)
+{
+  if (!A->data_ready)
+    return NULL;
+  return A->data;
+}
+
+void asill_done_buffer(struct asill_s *A)
+{
+  A->data_ready = 0;
+}
 

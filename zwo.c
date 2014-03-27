@@ -611,7 +611,7 @@ static char * zwo_get_str(void *cam, int ctrl)
   return "INVALID";
 }
 
-void zwo_close(void *cam_)
+static void zwo_close(void *cam_)
 {
   closeCamera();
 }
@@ -623,7 +623,7 @@ static void zwo_run(void * cam, int r)
   z->run = r;
 }
 
-void zwo_get_pars(void *cam, int *w, int *h, int *format, int *Bpp, int *sx, int *sy)
+static void zwo_get_pars(void *cam, int *w, int *h, int *format, int *Bpp, int *sx, int *sy)
 {
   struct zwo_cam *z = cam;
 
@@ -635,7 +635,7 @@ void zwo_get_pars(void *cam, int *w, int *h, int *format, int *Bpp, int *sx, int
   if (sy) *sy = z->starty;
 }
 
-void zwo_pulse (int dir, int n)
+static void zwo_pulse (int dir, int n)
 {
   //fprintf(stderr, "PULSE %d %d\n", dir, n);
   pulseGuide(dir, n);
@@ -761,6 +761,11 @@ static int zwo_isbin(void *cam, int res)
   return resolutions_bin[res];
 }
 
+uint8_t *zwo_get_buffer(void *cam, int done)
+{
+  return NULL;
+}
+
 struct yaaca_cam_s ZWO_CAM = {
   "ZWO Asi Camera",
   zwo_cam_init,
@@ -776,4 +781,5 @@ struct yaaca_cam_s ZWO_CAM = {
   zwo_maxw,
   zwo_maxh,
   zwo_isbin,
+  zwo_get_buffer,
 };
