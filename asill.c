@@ -135,7 +135,7 @@ static void run_q(struct asill_s *A)
       assert(0);
     }
     if (ret) {
-      fprintf(stderr, "control transfer failed: %s(%d)\n", libusb_error_name(ret), ret);
+      fprintf(stderr, "control transfer failed: (%d)\n", ret);
     }
   }
   A->n_cmds = 0;
@@ -329,7 +329,6 @@ static void init(struct asill_s *A)
   set_reg(A, MT9M034_LINE_LENGTH_PCK, 0x056e);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, 0x0473);
 
-#if 1
   A->width = 1280;
   A->height = 960;
   A->pclk = ASILL_PCLK_40MHZ;
@@ -337,37 +336,6 @@ static void init(struct asill_s *A)
   A->start_x = 0;
   A->start_y = 0;
   setup_frame(A);
-#else
-  set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, 0x01bc);
-  set_reg(A, MT9M034_RESET_REGISTER, 0x10da);
-  sleep_ms(A, 101);
-  set_reg(A, MT9M034_VT_PIX_CLK_DIV, 0x0002);
-  set_reg(A, MT9M034_VT_SYS_CLK_DIV, 0x0008);
-  set_reg(A, MT9M034_PRE_PLL_CLK_DIV, 0x0003);
-  set_reg(A, MT9M034_PLL_MULTIPLIER, 0x0019);
-  sleep_ms(A, 11);
-  set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
-  sleep_ms(A, 201);
-  send_ctrl(A, 0xac);
-  set_reg(A, MT9M034_DIGITAL_BINNING, 0x0000);
-  set_reg(A, MT9M034_Y_ADDR_START, 0x0002);
-  set_reg(A, MT9M034_X_ADDR_START, 0x0000);
-  set_reg(A, MT9M034_FRAME_LENGTH_LINES, 0x03da);
-  set_reg(A, MT9M034_Y_ADDR_END, 0x03c1);
-  set_reg(A, MT9M034_X_ADDR_END, 0x04ff);
-  set_reg(A, MT9M034_DIGITAL_BINNING, 0x0000);
-  set_reg(A, 0x306e, 0x9200);
-  set_reg(A, MT9M034_LINE_LENGTH_PCK, 0x073e);
-  set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, 0x01bc);
-  set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, 0x01bc);
-  set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
-  set_reg(A, MT9M034_COLUMN_CORRECTION, 0x0000);
-  set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
-  sleep_ms(A, 51);
-  set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
-  set_reg(A, MT9M034_COLUMN_CORRECTION, 0xe007);
-  set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
-#endif
 
   /* unity gain */
   set_reg(A, MT9M034_RED_GAIN, 0x0020);
@@ -423,7 +391,7 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
   if (!ctx) {
     if ((ret = libusb_init(&ctx))) {
       ctx = NULL;
-      fprintf(stderr, "libusb_init failed: %s(%d)\n", libusb_error_name(ret), ret);
+      fprintf(stderr, "libusb_init failed: (%d)\n", ret);
       A = NULL;
       goto asill_new_exit;
     }
@@ -446,7 +414,7 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
 	  A = calloc(1, sizeof(*A));
 	  ret = libusb_open(device, &A->h);
 	  if (ret) {
-	    fprintf(stderr, "libusb_open failed: %s(%d)\n", libusb_error_name(ret), ret);
+	    fprintf(stderr, "libusb_open failed: (%d)\n", ret);
 	    free(A);
 	    A = NULL;
 	    i = cnt;
