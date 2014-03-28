@@ -31,6 +31,94 @@
 static struct asill_s *A;
 static struct yaaca_ctrl *c;
 
+static char **resolutions;
+static char *all_resolutions_asi120[] = {
+  "1280X960",
+  "960X960",
+  "1024X768",
+  "800X800",
+  "800X640",
+  "728X512",
+  "640X480",
+  "512X512",
+  "480X320",
+  "320X240",
+  "2X2Bin:640X480",
+  NULL,
+};
+
+static int *resolutions_x;
+static int all_resolutions_x_asi120[] = {
+  1280,
+  960,
+  1024,
+  800,
+  800,
+  728,
+  640,
+  512,
+  480,
+  320,
+  640,
+};
+
+static int *resolutions_y;
+static int all_resolutions_y_asi120[] = {
+  960,
+  960,
+  768,
+  800,
+  640,
+  512,
+  480,
+  512,
+  320,
+  240,
+  480,
+};
+
+static int *resolutions_bin;
+static int all_resolutions_bin_asi120[] = {
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  2,
+};
+
+static int resolutions_n;
+
+static char *all_formats[] = {
+  "RAW16",
+  NULL,
+};
+static int n_formats = 1;
+static int format_dim[] = {
+  2,
+};
+
+static char *NY[] = {
+  "no",
+  "yes",
+  NULL,
+};
+
+static char *plcks[] = {
+  "24",
+  "40",
+  "48",
+  "96",
+  "8",
+  "2",
+  NULL,
+};
+
 /* 
    n is 0-9 refered to ASI120MM
    n is 10-11 refered to ASI120MC
@@ -39,6 +127,7 @@ static struct yaaca_ctrl *c;
 static void *zwoll_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *maxw, int *maxh)
 {
   uint16_t model = (n >= 10) ? ASILL_ASI120MC : ASILL_ASI120MM;
+  int nc;
 
   if (n >= 10)
     n -= 10;
@@ -48,13 +137,69 @@ static void *zwoll_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int 
     return NULL;
   }
 
-  *maxw = 1280;
-  *maxh = 960;
+  *maxw = asill_get_maxw(A);
+  *maxh = asill_get_maxh(A);
 
   c = calloc(30, sizeof(struct yaaca_ctrl));
   assert(c);
   *ctrls = c;
-  *n_ctrls = 0;
+
+  resolutions = all_resolutions_asi120;
+  resolutions_x = all_resolutions_x_asi120;
+  resolutions_y = all_resolutions_y_asi120;
+  resolutions_bin = all_resolutions_bin_asi120;
+
+  while (*resolutions_x > *maxw || *resolutions_y > *maxh) {
+    resolutions++;
+    resolutions_x++;
+    resolutions_y++;
+    resolutions_bin++;
+  }
+  while (resolutions[resolutions_n])
+    resolutions_n++;
+
+#define NEW_CTRL(TYPE, NAME, MIN, MAX, TEXT, FLAGS, DEF)	\
+  c[nc].type = TYPE;						\
+  strcpy(c[nc].name, NAME);					\
+  c[nc].min = MIN;						\
+  c[nc].max = MAX;						\
+  c[nc].text = TEXT;						\
+  c[nc].flags = FLAGS;						\
+  c[nc].def = (DEF);						\
+  nc += 1
+
+  nc = 0;
+
+  NEW_CTRL(YAACA_ENUM, "format", 0, n_formats - 1, &all_formats[0], 0, 0); /* 0 */
+  NEW_CTRL(YAACA_ENUM, "flipx", 0, 1, &NY[0], 0, 0);	/* 1 */
+  NEW_CTRL(YAACA_ENUM, "flipy", 0, 1, &NY[0], 0, 0);	/* 2 */
+  NEW_CTRL(YAACA_REAL, "temp", 0, 0, NULL, YAACA_RO, 0);	/* 3 */
+  NEW_CTRL(YAACA_REAL, "dropped", 0, 0, NULL, YAACA_RO, 0); /* 4 */
+  NEW_CTRL(YAACA_REAL, "pixel size", 0, 0, NULL, YAACA_RO, 0); /* 5 */
+  NEW_CTRL(YAACA_REAL, "bayern", 0, 0, NULL, YAACA_RO, 0);	    /* 6 */
+  NEW_CTRL(YAACA_STRING, "model", 0, 0, NULL, YAACA_RO, 0);    /* 7 */
+  NEW_CTRL(YAACA_REAL, "color", 0, 1, NULL, YAACA_RO, 0);	    /* 8 */
+  NEW_CTRL(YAACA_REAL, "start x", 0, *maxw, NULL, 0, 0);	    /* 9 */
+  NEW_CTRL(YAACA_REAL, "start y", 0, *maxh, NULL, 0, 0);	    /* 10 */
+  NEW_CTRL(YAACA_ENUM, "resolution", 0, resolutions_n, &resolutions[0], 0, 0); /* 11 */
+
+  NEW_CTRL(YAACA_REAL, "anal gain", 1, 8, NULL, 0, 1); /* 12 */
+  NEW_CTRL(YAACA_REAL, "digi gain", 0, 255, NULL, 0, 0x20); /* 13 */
+  NEW_CTRL(YAACA_REAL, "digi gain R", 0, 255, NULL, 0, 0x20); /* 14 */
+  NEW_CTRL(YAACA_REAL, "digi gain G1", 0, 255, NULL, 0, 0x20); /* 15 */
+  NEW_CTRL(YAACA_REAL, "digi gain G2", 0, 255, NULL, 0, 0x20); /* 16 */
+  NEW_CTRL(YAACA_REAL, "digi gain B", 0, 255, NULL, 0, 0x20);	 /* 17 */
+  NEW_CTRL(YAACA_ENUM, "bias sub", 0, 1, &NY[0], 0, 1);	 /* 18 */
+  NEW_CTRL(YAACA_ENUM, "row denoise", 0, 1, &NY[0], 0, 1);	 /* 19 */
+  NEW_CTRL(YAACA_ENUM, "col denoise", 0, 1, &NY[0], 0, 1);	 /* 20 */
+  NEW_CTRL(YAACA_ENUM, "plck mhz", 0, 6, plcks, 0, 0);	 /* 21 */
+  NEW_CTRL(YAACA_REAL, "fps", 0, 0, NULL, YAACA_RO, 0); /* 22 */
+  NEW_CTRL(YAACA_REAL, "exp us", 0, 1000000000, NULL, 0, 10000); /* 23 */
+  NEW_CTRL(YAACA_REAL, "exp min us", 0, 1000000000, NULL, 0, 10000); /* 24 */
+  NEW_CTRL(YAACA_REAL, "exp max us", 0, 1000000000, NULL, 0, 10000); /* 25 */
+
+  *n_ctrls = nc;
+
   return A;
 }
 

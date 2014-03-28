@@ -264,7 +264,7 @@ static char *all_formats[] = {
   "Y8",
   NULL,
 };
-static char *formats[3];
+static char *formats[5];
 static int n_formats;
 
 static int format_dim[] = {

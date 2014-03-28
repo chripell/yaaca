@@ -34,6 +34,9 @@
 #define CMD_SET_REG 1
 #define CMD_SEND 2
 
+#define W_EXCESS 200
+#define H_EXCESS 26
+
 struct cmd_s {
   int cmd;
   int p1;
@@ -50,7 +53,8 @@ struct asill_s {
   size_t max_cmds;
   size_t n_cmds;
   pthread_mutex_t cmd_lock;
-  uint16_t shadow[0x200];
+  uint16_t shadow[0x1000];
+  int is_color;
 
   uint8_t *data;
   volatile int data_ready;
@@ -62,6 +66,7 @@ struct asill_s {
   uint16_t height;
   uint16_t start_x;
   uint16_t start_y;
+  int bin;
 
   uint16_t digital_gain;
   uint16_t digital_gain_R;
@@ -71,10 +76,8 @@ struct asill_s {
 
   uint32_t pclk;
   uint32_t exposure_us;
-  uint16_t M_pll_mul;
-  uint16_t N_pre_pll_div;
-  uint16_t P1_sys_div;
-  uint16_t P2_pix_div;
+  uint32_t exposure_min_us;
+  uint32_t exposure_max_us;
 };
 
 static int do_debug;
@@ -124,7 +127,7 @@ static void set_reg(struct asill_s *A, int r, int v)
   c->cmd = CMD_SET_REG;
   c->p1 = r;
   c->p2 = v;
-  if (r >= 0x3000 && r < 0x3200)
+  if (r >= 0x3000 && r < 0x4000)
     A->shadow[r - 0x3000] = v;
 }
 
@@ -160,16 +163,24 @@ static void run_q(struct asill_s *A)
 
 static int get_reg(struct asill_s *A, int r)
 {
-  if (r >= 0x3000 && r < 0x3200)
+  if (r >= 0x3000 && r < 0x4000)
     return A->shadow[r - 0x3000];
   return 0;
 }
 
-static void setup_frame(struct asill_s *A)
+static void set_reg_mask(struct asill_s *A, int r, int mask, int v)
+{
+  int nv = get_reg(A, r) & ~mask;
+
+  nv |= v;
+  set_reg(A, r, nv);
+}
+
+static int setup_frame(struct asill_s *A)
 {
 #define MAX_COARSE 0x8000
-  uint16_t tot_w = A->width + 200;
-  uint16_t tot_h = A->height + 26;
+  uint16_t tot_w = A->width + W_EXCESS;
+  uint16_t tot_h = A->height + H_EXCESS;
   uint16_t coarse;
   double pclk = 48000000.0 * M_PLL_mul[A->pclk] / (N_pre_div[A->pclk] * P1_sys_div[A->pclk] * P2_clk_div[A->pclk]);
   double line_us = (tot_w / pclk) * 1000000.0;
@@ -182,7 +193,8 @@ static void setup_frame(struct asill_s *A)
     pr_debug("%s tot_w %d coarse %d line_us %f\n", __FUNCTION__, tot_w, coarse, line_us);
   }
   pr_debug("%s finale: tot_w %d coarse %d line_us %f\n", __FUNCTION__, tot_w, coarse, line_us);
-  pr_debug("%s real exp us: %f\n", __FUNCTION__, coarse * line_us);
+  A->exposure_us = coarse * line_us;
+  pr_debug("%s real exp us: %u\n", __FUNCTION__, A->exposure_us);
   
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10da);
@@ -195,24 +207,26 @@ static void setup_frame(struct asill_s *A)
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
   sleep_ms(A, 201);
   send_ctrl(A, 0xac);
-  set_reg(A, MT9M034_DIGITAL_BINNING, 0x0000);
+  set_reg(A, MT9M034_DIGITAL_BINNING, A->bin == 2 ? 0x0003 : 0x0000);
   set_reg(A, MT9M034_Y_ADDR_START, 0x0002 + A->start_y);
   set_reg(A, MT9M034_X_ADDR_START, A->start_x);
   set_reg(A, MT9M034_FRAME_LENGTH_LINES, tot_h);
   set_reg(A, MT9M034_Y_ADDR_END, 0x0002 + A->start_y + A->height -1);
   set_reg(A, MT9M034_X_ADDR_END, A->start_x + A->width - 1);
-  set_reg(A, MT9M034_DIGITAL_BINNING, 0x0000);
-  set_reg(A, 0x306e, 0x9200);
+  set_reg(A, MT9M034_DIGITAL_BINNING, A->bin == 2 ? 0x0003 : 0x0000);
+  set_reg(A, 0x306e, 0x9200 | (A->is_color ? 0x10 : 0));
   set_reg(A, MT9M034_LINE_LENGTH_PCK, tot_w);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
   set_reg(A, MT9M034_COLUMN_CORRECTION, 0x0000);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
+  /* TODO: this should be proportional to exposure */
   sleep_ms(A, 51);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
   set_reg(A, MT9M034_COLUMN_CORRECTION, 0xe007);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
+  return 0;
 }
 
 static void init(struct asill_s *A)
@@ -345,12 +359,6 @@ static void init(struct asill_s *A)
   set_reg(A, MT9M034_LINE_LENGTH_PCK, 0x056e);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, 0x0473);
 
-  A->width = 1280;
-  A->height = 960;
-  A->pclk = ASILL_PCLK_40MHZ;
-  A->exposure_us = 10000;
-  A->start_x = 0;
-  A->start_y = 0;
   setup_frame(A);
 
   /* unity gain */
@@ -377,13 +385,13 @@ static void *worker(void *A_)
     int transfered, ret;
 
     run_q(A);
-    if ((ret = libusb_bulk_transfer(A->h, 0x82, A->d, A->width * A->height * 2, &transfered, 1000)) == 0) {
+    if ((ret = libusb_bulk_transfer(A->h, 0x82, A->d, A->width * A->height * 2 / (A->bin * A->bin), &transfered, 1000)) == 0) {
       if (A->data && !A->data_ready) {
-	memcpy(A->data, A->d, A->width * A->height * 2);
+	memcpy(A->data, A->d, A->width * A->height * 2 / (A->bin * A->bin));
 	A->data_ready = 1;
       }
       if (A->cb) {
-	A->cb(A->d, A->width, A->height);
+	A->cb(A->d, A->width / A->bin, A->height / A->bin);
       }
     }
     else {
@@ -391,6 +399,17 @@ static void *worker(void *A_)
     }
   }
   return NULL;
+}
+
+void calc_min_max_exp(struct asill_s *A)
+{
+  uint16_t tot_w = A->width + W_EXCESS;
+  uint16_t tot_h = A->height + H_EXCESS;
+  double pclk = 48000000.0 * M_PLL_mul[A->pclk] / (N_pre_div[A->pclk] * P1_sys_div[A->pclk] * P2_clk_div[A->pclk]);
+
+  A->exposure_min_us = 1000000.0 * tot_w * tot_h / pclk;
+  A->exposure_max_us = 0x8000 * (65535.0 / pclk) * 1000000.0;
+  pr_debug("%s exp_us min %u max %u", __FUNCTION__, A->exposure_min_us, A->exposure_max_us);
 }
 
 struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame_f cb)
@@ -447,7 +466,6 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
   libusb_free_device_list(list, 1);
 
   if (A) {
-    init(A);
     A->max_width = 1280;
     A->max_height = 960;
     A->width = A->max_width;
@@ -457,11 +475,20 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
     A->digital_gain_G1 = 0x20;
     A->digital_gain_G2 = 0x20;
     A->digital_gain_B = 0x20;
+    A->bin = 1;
     A->cb = cb;
+    A->pclk = ASILL_PCLK_24MHZ;
+    A->exposure_us = 10000;
+    A->start_x = 0;
+    A->start_y = 0;
+    calc_min_max_exp(A);
+    if (model == ASILL_ASI120MC)
+      A->is_color = 1;
+    init(A);
     if (has_buffer) {
-      A->data = malloc(A->max_width * A->max_height * 2);
+      A->data = malloc(A->max_width * A->max_height * 2 / (A->bin * A->bin));
     }
-    A->d = malloc(A->max_width * A->max_height * 2);
+    A->d = malloc(A->max_width * A->max_height * 2 / (A->bin * A->bin));
     run_q(A);
     A->running = 1;
     assert(pthread_create(&A->th, NULL, worker, A) == 0);
@@ -484,3 +511,96 @@ void asill_done_buffer(struct asill_s *A)
   A->data_ready = 0;
 }
 
+int asill_sel_pclk(struct asill_s *A, int pclk)
+{
+  A->pclk = pclk;
+  return setup_frame(A);
+}
+
+int asill_get_pclk(struct asill_s *A)
+{
+  return A->pclk;
+}
+
+int asill_set_wh(struct asill_s *A, uint16_t w, uint16_t h, int bin)
+{
+  A->width = w;
+  A->height = h;
+  A->bin = bin;
+  pthread_mutex_lock(&A->cmd_lock);
+  setup_frame(A);
+  pthread_mutex_unlock(&A->cmd_lock);
+  return 0;
+}
+
+uint16_t asill_get_w(struct asill_s *A)
+{
+  return A->width;
+}
+
+uint16_t asill_get_h(struct asill_s *A)
+{
+  return A->height;
+}
+
+int asill_get_bin(struct asill_s *A)
+{
+  return A->bin;
+}
+
+uint16_t asill_get_maxw(struct asill_s *A)
+{
+  return A->max_width;
+}
+
+uint16_t asill_get_maxh(struct asill_s *A)
+{
+  return A->max_height;
+}
+
+int asill_set_xy(struct asill_s *A, uint16_t x, uint16_t y)
+{
+  if (x + A->width >= A->max_width || y + A->height >= A->max_height)
+    return -1;
+  A->start_x = x;
+  A->start_y = y;
+  pthread_mutex_lock(&A->cmd_lock);
+  setup_frame(A);
+  pthread_mutex_unlock(&A->cmd_lock);
+  return 0;  
+}
+
+ /* gain from 1 to 8 */
+int asill_set_analog_gain(struct asill_s *A, int gain)
+{
+  int a,b;
+
+  gain = gain - 1;
+  if (gain < 0)
+    gain = 0;
+  if (gain > 7)
+    gain = 7;
+  a = gain / 2;
+  b = (gain & 1) * 3;
+  pthread_mutex_lock(&A->cmd_lock);
+  set_reg_mask(A, 0x30b0, (3 << 4), (a << 4));  
+  set_reg_mask(A, 0x3ee4, (3 << 8), (b << 8));  
+  pthread_mutex_unlock(&A->cmd_lock);
+  return 0;
+}
+
+int asill_set_digital_gain(struct asill_s *A, int gain, int gainR, int gainG1, int gainG2, int gainB);
+
+int asill_set_exp_us(struct asill_s *A, uint32_t exp);
+uint32_t asill_get_exp_us(struct asill_s *A);
+uint32_t asill_get_min_exp_us(struct asill_s *A);
+uint32_t asill_get_max_exp_us(struct asill_s *A);
+
+int asill_set_bias_sub(struct asill_s *A, int on);
+int asill_set_row_denoise(struct asill_s *A, int on);
+int asill_set_col_denoise(struct asill_s *A, int on);
+
+float asill_get_temp(struct asill_s *A);
+int asill_is_color(struct asill_s *A);
+
+int asill_set_save(struct asill_s *A, const char *path);
