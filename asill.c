@@ -38,7 +38,7 @@
 #define CMD_SET_REG 1
 #define CMD_SEND 2
 
-#define W_EXCESS 200
+#define W_EXCESS 600
 #define H_EXCESS 26
 
 struct cmd_s {
@@ -188,7 +188,7 @@ void calc_min_max_exp(struct asill_s *A)
 
   A->exposure_min_us = 1000000.0 * tot_w * tot_h / pclk;
   A->exposure_max_us = 0x8000 * (65535.0 / pclk) * 1000000.0;
-  pr_debug("%s exp_us min %u max %u", __FUNCTION__, A->exposure_min_us, A->exposure_max_us);
+  pr_debug("%s exp_us min %u max %u\n", __FUNCTION__, A->exposure_min_us, A->exposure_max_us);
 }
 
 static int setup_frame(struct asill_s *A)
@@ -201,6 +201,7 @@ static int setup_frame(struct asill_s *A)
   double line_us = (tot_w / pclk) * 1000000.0;
 
   pr_debug("%s pclk %f exp %u line_us %f\n", __FUNCTION__, pclk, A->exposure_us, line_us);
+  pr_debug("%s %dx%d:%d\n", __FUNCTION__, A->width, A->height, A->bin);
 
   while( (coarse = A->exposure_us / line_us) > MAX_COARSE) {
     tot_w *= 2;
@@ -376,14 +377,14 @@ static void init(struct asill_s *A)
   set_reg(A, MT9M034_LINE_LENGTH_PCK, 0x056e);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, 0x0473);
 
-  setup_frame(A);
-
   /* unity gain */
   set_reg(A, MT9M034_RED_GAIN, 0x0020);
   set_reg(A, MT9M034_BLUE_GAIN, 0x0020);
   set_reg(A, MT9M034_GREEN1_GAIN, 0x0020);
   set_reg(A, MT9M034_GREEN2_GAIN, 0x0020);
   set_reg(A, MT9M034_GLOBAL_GAIN, 0x0020);
+
+  setup_frame(A);
 
   /* start capture */
   send_ctrl(A, 0xaa);
@@ -499,7 +500,7 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
     A->max_height = 960;
     A->width = A->max_width;
     A->height = A->max_height;
-    A->pars[ASILL_PAR_ANALOG_GAIN] = 1;
+    A->pars[ASILL_PAR_ANALOG_GAIN] = 8;
     A->pars[ASILL_PAR_DIGITAL_GAIN] = 0x20;
     A->pars[ASILL_PAR_DIGITAL_GAIN_R] = 0x20;
     A->pars[ASILL_PAR_DIGITAL_GAIN_G1] = 0x20;
@@ -608,6 +609,7 @@ int asill_set_int_par(struct asill_s *A, int par, int gain)
   int ret = 0;
   int a,b;
 
+  fprintf(stderr, "DELME %d=%d\n", par, gain);
   pthread_mutex_lock(&A->cmd_lock);
   switch(par) {
   case ASILL_PAR_ANALOG_GAIN:

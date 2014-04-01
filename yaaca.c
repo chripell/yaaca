@@ -394,6 +394,8 @@ static gboolean redraw_fps(gpointer user_data)
 {
   char stat[200];
 
+  if (ccam == &ZWO_CAMLL)
+    fps = ccam->get(cam, 22);
   temp = ccam->get(cam, 3);
   snprintf(stat, 200, "T: %.1f, Dropped: %.0f FPS: %.2f", temp, ccam->get(cam, 4), fps);
   gtk_label_set_text(GTK_LABEL(status2), stat);

@@ -211,6 +211,14 @@ static void *zwoll_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int 
 
 static int par_maps[] = {
   [12] = ASILL_PAR_ANALOG_GAIN,
+  [13] = ASILL_PAR_DIGITAL_GAIN,
+  [14] = ASILL_PAR_DIGITAL_GAIN_R,
+  [15] = ASILL_PAR_DIGITAL_GAIN_G1,
+  [16] = ASILL_PAR_DIGITAL_GAIN_G2,
+  [17] = ASILL_PAR_DIGITAL_GAIN_B,
+  [18] = ASILL_PAR_BIAS_SUB,
+  [19] = ASILL_PAR_ROW_DENOISE,
+  [20] = ASILL_PAR_COL_DENOISE,
 };
 
 static int zwoll_set(void * cam, int ctrl, double val, int autov)
