@@ -24,12 +24,18 @@
 #include <sys/utsname.h>
 #include <sys/types.h>
 
+#include <glib.h>
+
 #include "yaaca.h"
 
 #include "asill.h"
 
-static struct asill_s *A;
 static struct yaaca_ctrl *c;
+
+struct zwoll_s {
+  int res;
+  struct asill_s *A;
+};
 
 static char **resolutions;
 static char *all_resolutions_asi120[] = {
@@ -99,9 +105,6 @@ static char *all_formats[] = {
   NULL,
 };
 static int n_formats = 1;
-static int format_dim[] = {
-  2,
-};
 
 static char *NY[] = {
   "no",
@@ -126,6 +129,8 @@ static char *plcks[] = {
  */
 static void *zwoll_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *maxw, int *maxh)
 {
+  struct asill_s *A;
+  struct zwoll_s *Z;
   uint16_t model = (n >= 10) ? ASILL_ASI120MC : ASILL_ASI120MM;
   int nc;
 
@@ -199,23 +204,98 @@ static void *zwoll_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int 
   NEW_CTRL(YAACA_REAL, "exp max us", 0, 1000000000, NULL, 0, 10000); /* 25 */
 
   *n_ctrls = nc;
-
-  return A;
+  Z = g_malloc0(sizeof(*Z));
+  Z->A = A;
+  return Z;
 }
+
+static int par_maps[] = {
+  [12] = ASILL_PAR_ANALOG_GAIN,
+};
 
 static int zwoll_set(void * cam, int ctrl, double val, int autov)
 {
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
+
+  switch(ctrl) {
+  case 9:
+    asill_set_xy(A, val, asill_get_y(A));
+    break;
+  case 10:
+    asill_set_xy(A, asill_get_x(A), val);
+    break;
+  case 11:
+    Z->res = val;
+    asill_set_wh(A, resolutions_x[(int)val], resolutions_y[(int)val], resolutions_bin[(int)val]);
+    break;
+  case 12:
+  case 13:
+  case 14:
+  case 15:
+  case 16:
+  case 17:
+  case 18:
+  case 19:
+  case 20:
+    asill_set_int_par(A, par_maps[ctrl], val);
+    break;
+  case 21:
+    asill_sel_pclk(A, val);
+    break;
+  case 23:
+    asill_set_exp_us(A, val);
+  default:
+    return -1;
+  }
   return 0;
 }
 
 static double zwoll_get(void * cam, int ctrl)
 {
-  return 0.0;
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
+
+  switch(ctrl) {
+  case 0:
+    return YAACA_FMT_RAW16;
+  case 3:
+    return asill_get_temp(A);
+  case 8:
+    return asill_is_color(A);
+  case 9:
+    return asill_get_x(A);
+  case 10:
+    return asill_get_y(A);
+  case 11:
+    return Z->res;
+  case 12:
+  case 13:
+  case 14:
+  case 15:
+  case 16:
+  case 17:
+  case 18:
+  case 19:
+  case 20:
+    return asill_get_int_par(A, par_maps[ctrl]);
+  case 21:
+    return asill_get_pclk(A);
+  case 22:
+    return asill_get_fps(A);
+  case 23:
+    return asill_get_exp_us(A);
+  case 24:
+    return asill_get_min_exp_us(A);
+  case 25:
+    return asill_get_max_exp_us(A);
+  }
+  return 0;
 }
 
 static char * zwoll_get_str(void *cam, int ctrl)
 {
-  return NULL;
+  return "ZWO LL";
 }
 
 static void zwoll_close(void *cam_)
@@ -224,12 +304,15 @@ static void zwoll_close(void *cam_)
 
 static void zwoll_get_pars(void *cam, int *w, int *h, int *format, int *Bpp, int *sx, int *sy)
 {
-  *w = 1280;
-  *h = 960;
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
+
+  *w = asill_get_w(A);
+  *h = asill_get_h(A);
   *format = YAACA_FMT_RAW16;
   *Bpp = 2;
-  *sx = 0;
-  *sy = 0;
+  *sx = asill_get_x(A);
+  *sy = asill_get_y(A);
 }
 
 static void zwoll_pulse (int dir, int n)
@@ -246,22 +329,32 @@ static void zwoll_save(void *cam)
 
 static int zwoll_maxw(void *cam)
 {
-  return 1280;
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
+
+  return asill_get_maxw(A);
 }
 
 static int zwoll_maxh(void *cam)
 {
-  return 960;
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
+
+  return asill_get_maxh(A);
 }
 
 static int zwoll_isbin(void *cam, int res)
 {
-  return 0;
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
+
+  return asill_get_bin(A);
 }
 
 uint8_t *zwoll_get_buffer (void *cam, int done)
 {
-  struct asill_s *A = (struct asill_s *) cam;
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
 
   if (done) {
     asill_done_buffer(A);
@@ -271,6 +364,11 @@ uint8_t *zwoll_get_buffer (void *cam, int done)
 
 static void zwoll_run(void * cam, int r)
 {
+}
+
+static int zwoll_save_path(void *cam, const char *path)
+{
+  return -1;
 }
 
 struct yaaca_cam_s ZWO_CAMLL = {
@@ -289,5 +387,6 @@ struct yaaca_cam_s ZWO_CAMLL = {
   zwoll_maxh,
   zwoll_isbin,
   zwoll_get_buffer,
+  zwoll_save_path,
 };
 

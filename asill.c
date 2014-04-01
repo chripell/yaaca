@@ -29,6 +29,10 @@
 
 #define pr_debug(x...) if (do_debug) fprintf(stderr, x)
 
+#ifndef MAX_PATH
+#define MAX_PATH 255
+#endif
+
 #define MAX_CMDS 200
 #define CMD_SLEEP_MS 0
 #define CMD_SET_REG 1
@@ -55,10 +59,14 @@ struct asill_s {
   pthread_mutex_t cmd_lock;
   uint16_t shadow[0x1000];
   int is_color;
+  int pars[ASILL_PAR_N];
 
   uint8_t *data;
   volatile int data_ready;
   asill_new_frame_f cb;
+  float fps;
+  int fps_n;
+  struct timeval last_fps_comp;
 
   uint16_t max_width;
   uint16_t max_height;
@@ -68,16 +76,12 @@ struct asill_s {
   uint16_t start_y;
   int bin;
 
-  uint16_t digital_gain;
-  uint16_t digital_gain_R;
-  uint16_t digital_gain_G1;
-  uint16_t digital_gain_G2;
-  uint16_t digital_gain_B;
-
   uint32_t pclk;
   uint32_t exposure_us;
   uint32_t exposure_min_us;
   uint32_t exposure_max_us;
+
+  char save_path[MAX_PATH];
 };
 
 static int do_debug;
@@ -176,6 +180,17 @@ static void set_reg_mask(struct asill_s *A, int r, int mask, int v)
   set_reg(A, r, nv);
 }
 
+void calc_min_max_exp(struct asill_s *A)
+{
+  uint16_t tot_w = A->width + W_EXCESS;
+  uint16_t tot_h = A->height + H_EXCESS;
+  double pclk = 48000000.0 * M_PLL_mul[A->pclk] / (N_pre_div[A->pclk] * P1_sys_div[A->pclk] * P2_clk_div[A->pclk]);
+
+  A->exposure_min_us = 1000000.0 * tot_w * tot_h / pclk;
+  A->exposure_max_us = 0x8000 * (65535.0 / pclk) * 1000000.0;
+  pr_debug("%s exp_us min %u max %u", __FUNCTION__, A->exposure_min_us, A->exposure_max_us);
+}
+
 static int setup_frame(struct asill_s *A)
 {
 #define MAX_COARSE 0x8000
@@ -226,6 +241,8 @@ static int setup_frame(struct asill_s *A)
   set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
   set_reg(A, MT9M034_COLUMN_CORRECTION, 0xe007);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
+
+  calc_min_max_exp(A);
   return 0;
 }
 
@@ -377,15 +394,23 @@ static void init(struct asill_s *A)
   pthread_mutex_unlock(&A->cmd_lock);
 }
 
+static int diff_us(struct timeval from, struct timeval to)
+{
+  return 1000000 * (to.tv_sec - from.tv_sec) + (to.tv_usec - from.tv_usec);
+}
+
 static void *worker(void *A_)
 {
   struct asill_s *A = (struct asill_s *) A_;
 
   while (A->running) {
     int transfered, ret;
-
+    
     run_q(A);
     if ((ret = libusb_bulk_transfer(A->h, 0x82, A->d, A->width * A->height * 2 / (A->bin * A->bin), &transfered, 1000)) == 0) {
+      struct timeval now;
+
+      gettimeofday(&now, NULL);
       if (A->data && !A->data_ready) {
 	memcpy(A->data, A->d, A->width * A->height * 2 / (A->bin * A->bin));
 	A->data_ready = 1;
@@ -393,23 +418,27 @@ static void *worker(void *A_)
       if (A->cb) {
 	A->cb(A->d, A->width / A->bin, A->height / A->bin);
       }
+      A->fps_n += 1;
+      if (A->last_fps_comp.tv_sec == 0 && A->last_fps_comp.tv_usec == 0)
+	gettimeofday(&A->last_fps_comp, NULL);
+      else {
+	int e;
+
+	e = diff_us(A->last_fps_comp, now);
+	if (e > 1000000) {
+	  float xframe = ((float) e) / A->fps_n;
+
+	  A->fps = 1000000.0 / xframe;
+	  A->last_fps_comp = now;
+	  A->fps_n = 0;
+	}
+      }
     }
     else {
       fprintf(stderr, "bulk transfer failed: %d\n", ret);
     }
   }
   return NULL;
-}
-
-void calc_min_max_exp(struct asill_s *A)
-{
-  uint16_t tot_w = A->width + W_EXCESS;
-  uint16_t tot_h = A->height + H_EXCESS;
-  double pclk = 48000000.0 * M_PLL_mul[A->pclk] / (N_pre_div[A->pclk] * P1_sys_div[A->pclk] * P2_clk_div[A->pclk]);
-
-  A->exposure_min_us = 1000000.0 * tot_w * tot_h / pclk;
-  A->exposure_max_us = 0x8000 * (65535.0 / pclk) * 1000000.0;
-  pr_debug("%s exp_us min %u max %u", __FUNCTION__, A->exposure_min_us, A->exposure_max_us);
 }
 
 struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame_f cb)
@@ -470,11 +499,15 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
     A->max_height = 960;
     A->width = A->max_width;
     A->height = A->max_height;
-    A->digital_gain = 0x20;
-    A->digital_gain_R = 0x20;
-    A->digital_gain_G1 = 0x20;
-    A->digital_gain_G2 = 0x20;
-    A->digital_gain_B = 0x20;
+    A->pars[ASILL_PAR_ANALOG_GAIN] = 1;
+    A->pars[ASILL_PAR_DIGITAL_GAIN] = 0x20;
+    A->pars[ASILL_PAR_DIGITAL_GAIN_R] = 0x20;
+    A->pars[ASILL_PAR_DIGITAL_GAIN_G1] = 0x20;
+    A->pars[ASILL_PAR_DIGITAL_GAIN_G2] = 0x20;
+    A->pars[ASILL_PAR_DIGITAL_GAIN_B] = 0x20;
+    A->pars[ASILL_PAR_BIAS_SUB] = 1;
+    A->pars[ASILL_PAR_ROW_DENOISE] = 1;
+    A->pars[ASILL_PAR_COL_DENOISE] = 1;
     A->bin = 1;
     A->cb = cb;
     A->pclk = ASILL_PCLK_24MHZ;
@@ -570,37 +603,126 @@ int asill_set_xy(struct asill_s *A, uint16_t x, uint16_t y)
   return 0;  
 }
 
- /* gain from 1 to 8 */
-int asill_set_analog_gain(struct asill_s *A, int gain)
+int asill_set_int_par(struct asill_s *A, int par, int gain)
 {
+  int ret = 0;
   int a,b;
 
-  gain = gain - 1;
-  if (gain < 0)
-    gain = 0;
-  if (gain > 7)
-    gain = 7;
-  a = gain / 2;
-  b = (gain & 1) * 3;
   pthread_mutex_lock(&A->cmd_lock);
-  set_reg_mask(A, 0x30b0, (3 << 4), (a << 4));  
-  set_reg_mask(A, 0x3ee4, (3 << 8), (b << 8));  
+  switch(par) {
+  case ASILL_PAR_ANALOG_GAIN:
+     /* gain from 1 to 8 */
+    gain = gain - 1;
+    if (gain < 0)
+      gain = 0;
+    if (gain > 7)
+      gain = 7;
+    a = gain / 2;
+    b = (gain & 1) * 3;
+    set_reg_mask(A, 0x30b0, (3 << 4), (a << 4));  
+    set_reg_mask(A, 0x3ee4, (3 << 8), (b << 8));  
+    break;
+  case ASILL_PAR_DIGITAL_GAIN:
+    set_reg(A, MT9M034_GLOBAL_GAIN, gain);
+    break;
+  case ASILL_PAR_DIGITAL_GAIN_R:
+    set_reg(A, MT9M034_RED_GAIN, gain);
+    break;
+  case ASILL_PAR_DIGITAL_GAIN_G1:
+    set_reg(A, MT9M034_GREEN1_GAIN, gain);
+    break;
+  case ASILL_PAR_DIGITAL_GAIN_G2:
+    set_reg(A, MT9M034_GREEN2_GAIN, gain);
+    break;
+  case ASILL_PAR_DIGITAL_GAIN_B:
+    set_reg(A, MT9M034_BLUE_GAIN, gain);
+    break;
+  case ASILL_PAR_BIAS_SUB:
+    set_reg_mask(A, 0x30ea, (1 << 15), gain ? (1 << 15) : 0);  
+    break;
+  case ASILL_PAR_ROW_DENOISE:
+    set_reg_mask(A, 0x3044, (1 << 10), gain ? (1 << 10) : 0);  
+    break;
+  case ASILL_PAR_COL_DENOISE:
+    set_reg_mask(A, 0x30d3, (1 << 15), gain ? (1 << 15) : 0);  
+    break;
+  default:
+    ret = -1;
+  }
+  pthread_mutex_unlock(&A->cmd_lock);
+  if (ret == 0)
+    A->pars[par] = gain;
+  return ret;
+}
+
+int asill_get_int_par(struct asill_s *A, int par)
+{
+  return A->pars[par];
+}
+
+int asill_set_exp_us(struct asill_s *A, uint32_t exp)
+{
+  if (exp < A->exposure_min_us || exp > A->exposure_max_us) {
+    fprintf(stderr, "exposure out of limits, should be: %u <= %u <= %u\n",
+	    A->exposure_min_us, exp, A->exposure_max_us);
+  }
+  A->exposure_us = exp;
+  pthread_mutex_lock(&A->cmd_lock);
+  setup_frame(A);
   pthread_mutex_unlock(&A->cmd_lock);
   return 0;
 }
 
-int asill_set_digital_gain(struct asill_s *A, int gain, int gainR, int gainG1, int gainG2, int gainB);
+uint32_t asill_get_exp_us(struct asill_s *A)
+{
+  return A->exposure_us;
+}
 
-int asill_set_exp_us(struct asill_s *A, uint32_t exp);
-uint32_t asill_get_exp_us(struct asill_s *A);
-uint32_t asill_get_min_exp_us(struct asill_s *A);
-uint32_t asill_get_max_exp_us(struct asill_s *A);
+uint32_t asill_get_min_exp_us(struct asill_s *A)
+{
+  return A->exposure_min_us;  
+}
 
-int asill_set_bias_sub(struct asill_s *A, int on);
-int asill_set_row_denoise(struct asill_s *A, int on);
-int asill_set_col_denoise(struct asill_s *A, int on);
+uint32_t asill_get_max_exp_us(struct asill_s *A)
+{
+  return A->exposure_max_us;  
+}
 
-float asill_get_temp(struct asill_s *A);
-int asill_is_color(struct asill_s *A);
+float asill_get_temp(struct asill_s *A)
+{
+  //fprintf(stderr, "%s: TODO\n", __FUNCTION__);
+  return 0.0;
+}
 
-int asill_set_save(struct asill_s *A, const char *path);
+int asill_is_color(struct asill_s *A)
+{
+  return A->is_color;
+}
+
+int asill_set_save(struct asill_s *A, const char *path)
+{
+  if (path == NULL) {
+    A->save_path[0] = '\0';
+    return 0;
+  }
+  if (snprintf(A->save_path, MAX_PATH, "%s/", path) >= MAX_PATH) {
+    A->save_path[0] = '\0';
+    return -1;
+  }
+  return 0;
+}
+
+float asill_get_fps(struct asill_s *A)
+{
+  return A->fps;
+}
+
+uint16_t asill_get_x(struct asill_s *A)
+{
+  return A->start_x;
+}
+
+uint16_t asill_get_y(struct asill_s *A)
+{
+  return A->start_y;
+}

@@ -443,6 +443,7 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
 
   *maxw = getMaxWidth();
   *maxh = getMaxHeight();
+  fprintf(stderr, "DELME %d %d %d\n", *maxw, *maxh, getCameraType(n));
 
   switch(getCameraType(n)) {
   case CAMERA_ASI034MC:
@@ -766,6 +767,11 @@ uint8_t *zwo_get_buffer(void *cam, int done)
   return NULL;
 }
 
+int zwo_save_path(void *cam, const char *path)
+{
+  return -1;
+}
+
 struct yaaca_cam_s ZWO_CAM = {
   "ZWO Asi Camera",
   zwo_cam_init,
@@ -782,4 +788,5 @@ struct yaaca_cam_s ZWO_CAM = {
   zwo_maxh,
   zwo_isbin,
   zwo_get_buffer,
+  zwo_save_path,
 };

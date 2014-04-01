@@ -41,22 +41,30 @@ int asill_get_pclk(struct asill_s *A);
 int asill_set_wh(struct asill_s *A, uint16_t w, uint16_t h, int bin);
 uint16_t asill_get_w(struct asill_s *A);
 uint16_t asill_get_h(struct asill_s *A);
-int asill_get_bit(struct asill_s *A);
+int asill_get_bin(struct asill_s *A);
 uint16_t asill_get_maxw(struct asill_s *A);
 uint16_t asill_get_maxh(struct asill_s *A);
 int asill_set_xy(struct asill_s *A, uint16_t x, uint16_t y);
+uint16_t asill_get_x(struct asill_s *A);
+uint16_t asill_get_y(struct asill_s *A);
 
-int asill_set_analog_gain(struct asill_s *A, int gain);
-int asill_set_digital_gain(struct asill_s *A, int gain, int gainR, int gainG1, int gainG2, int gainB);
+#define ASILL_PAR_ANALOG_GAIN 0
+#define ASILL_PAR_DIGITAL_GAIN 1
+#define ASILL_PAR_DIGITAL_GAIN_R 2
+#define ASILL_PAR_DIGITAL_GAIN_G1 3
+#define ASILL_PAR_DIGITAL_GAIN_G2 4
+#define ASILL_PAR_DIGITAL_GAIN_B 5
+#define ASILL_PAR_BIAS_SUB 6
+#define ASILL_PAR_ROW_DENOISE 7
+#define ASILL_PAR_COL_DENOISE 8
+#define ASILL_PAR_N 9
+int asill_set_int_par(struct asill_s *A, int par, int gain);
+int asill_get_int_par(struct asill_s *A, int par);
 
 int asill_set_exp_us(struct asill_s *A, uint32_t exp);
 uint32_t asill_get_exp_us(struct asill_s *A);
 uint32_t asill_get_min_exp_us(struct asill_s *A);
 uint32_t asill_get_max_exp_us(struct asill_s *A);
-
-int asill_set_bias_sub(struct asill_s *A, int on);
-int asill_set_row_denoise(struct asill_s *A, int on);
-int asill_set_col_denoise(struct asill_s *A, int on);
 
 float asill_get_temp(struct asill_s *A);
 int asill_is_color(struct asill_s *A);
@@ -64,5 +72,6 @@ int asill_is_color(struct asill_s *A);
 uint8_t *asill_get_buffer(struct asill_s *A);
 void asill_done_buffer(struct asill_s *A);
 int asill_set_save(struct asill_s *A, const char *path);
+float asill_get_fps(struct asill_s *A);
 
 #endif

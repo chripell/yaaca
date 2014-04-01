@@ -61,6 +61,7 @@ struct yaaca_cam_s {
   int (*maxh) (void *cam);
   int (*isbin) (void *cam, int res);
   uint8_t * (*get_buffer) (void *cam, int done);
+  int (*save_path) (void *cam, const char *path);
 };
 
 #define YAACA_FMT_RAW8 0
