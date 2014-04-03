@@ -38,8 +38,8 @@
 #define CMD_SET_REG 1
 #define CMD_SEND 2
 
-#define W_EXCESS 600
-#define H_EXCESS 26
+#define W_EXCESS 450
+#define H_EXCESS 150
 
 struct cmd_s {
   int cmd;
@@ -78,6 +78,7 @@ struct asill_s {
 
   uint32_t pclk;
   uint32_t exposure_us;
+  uint32_t exposure_real_us;
   uint32_t exposure_min_us;
   uint32_t exposure_max_us;
 
@@ -89,6 +90,7 @@ static int do_debug;
 static libusb_context *ctx;
 static pthread_mutex_t lk = PTHREAD_MUTEX_INITIALIZER; 
 
+/*                              24  40  48  96   8   2  */
 const uint16_t M_PLL_mul[] =  { 32, 40, 40, 48, 32, 32};
 const uint16_t N_pre_div[] =  { 4,   6,  5,  6,  4,  4};
 const uint16_t P1_sys_div[] = { 4,   2,  2,  1, 12, 24};
@@ -193,12 +195,13 @@ void calc_min_max_exp(struct asill_s *A)
 
 static int setup_frame(struct asill_s *A)
 {
-#define MAX_COARSE 0x8000
+#define MAX_COARSE 0x2000
   uint16_t tot_w = A->width + W_EXCESS;
   uint16_t tot_h = A->height + H_EXCESS;
-  uint16_t coarse;
+  uint16_t coarse, fine;
   double pclk = 48000000.0 * M_PLL_mul[A->pclk] / (N_pre_div[A->pclk] * P1_sys_div[A->pclk] * P2_clk_div[A->pclk]);
   double line_us = (tot_w / pclk) * 1000000.0;
+  double fine_real;
 
   pr_debug("%s pclk %f exp %u line_us %f\n", __FUNCTION__, pclk, A->exposure_us, line_us);
   pr_debug("%s %dx%d:%d\n", __FUNCTION__, A->width, A->height, A->bin);
@@ -209,9 +212,13 @@ static int setup_frame(struct asill_s *A)
     pr_debug("%s tot_w %d coarse %d line_us %f\n", __FUNCTION__, tot_w, coarse, line_us);
   }
   pr_debug("%s finale: tot_w %d coarse %d line_us %f\n", __FUNCTION__, tot_w, coarse, line_us);
-  A->exposure_us = coarse * line_us;
-  pr_debug("%s real exp us: %u\n", __FUNCTION__, A->exposure_us);
+  fine_real = A->exposure_us *pclk / 1000000.0 - tot_w * coarse;
+  pr_debug("%s fine: %f\n", __FUNCTION__, fine_real);
+  fine = fine_real;
+  A->exposure_real_us = coarse * line_us + fine_real / (pclk / 1000000.0);
+  pr_debug("%s real exp us: %u\n", __FUNCTION__, A->exposure_real_us);
   
+  set_reg(A, MT9M034_FINE_INT_TIME, fine);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10da);
   sleep_ms(A, 101);
