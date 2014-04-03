@@ -315,12 +315,18 @@ static void zwoll_get_pars(void *cam, int *w, int *h, int *format, int *Bpp, int
   struct zwoll_s *Z = (struct zwoll_s *) cam;
   struct asill_s *A = Z->A;
 
-  *w = asill_get_w(A);
-  *h = asill_get_h(A);
-  *format = YAACA_FMT_RAW16;
-  *Bpp = 2;
-  *sx = asill_get_x(A);
-  *sy = asill_get_y(A);
+  if (w)
+    *w = asill_get_w(A);
+  if (h)
+    *h = asill_get_h(A);
+  if (format)
+    *format = YAACA_FMT_RAW16;
+  if (Bpp)
+    *Bpp = 2;
+  if (sx)
+    *sx = asill_get_x(A);
+  if (sy)
+    *sy = asill_get_y(A);
 }
 
 static void zwoll_pulse (int dir, int n)

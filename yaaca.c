@@ -850,10 +850,8 @@ static gboolean zwo_ll_timer(gpointer priv)
 
   if (b) {
     cimg_present = 1;
-    cimg_w = 1280;
-    cimg_h = 960;
-    cimg_format = YAACA_FMT_RAW16;
-    cimg_bpp = 16;
+    ccam->get_pars(cam, &cimg_w, &cimg_h, &cimg_format, &cimg_bpp, NULL, NULL);
+    cimg_bpp *= 8;
     cimg = b;
     redraw_image(NULL);
     ccam->get_buffer(cam, 1);
