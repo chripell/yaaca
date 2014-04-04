@@ -300,7 +300,7 @@ static void update_ctrl( GtkWidget *w, int n )
   else {
     val = atof(gtk_entry_get_text(GTK_ENTRY(ctrl_val[n])));
   }
-  if (ccam == &ZWO_CAM) {
+  if (ccam == &ZWO_CAM || ccam == &ZWO_CAMLL) {
     switch(n) {
     case 0:
       format = val;
@@ -327,7 +327,7 @@ static void update_ctrl( GtkWidget *w, int n )
   ccam->set(cam, n,
 	    val,
 	    autov);
-  if (ccam == &ZWO_CAM) {
+  if (ccam == &ZWO_CAM || ccam == &ZWO_CAMLL) {
     /* adjustment of ROI centered on the crosshair */
     if (n == 11) {
       if (ccam->isbin(cam, resolution) > 1) {
@@ -383,9 +383,12 @@ static int get_raw8_pix(int i, int j, int w)
 
 static int get_raw16_pix(int i, int j, int w)
 {
-  int y = (j / 2) * 2;
-  int x = (i / 2) * 2;
+  int y;
+  int x;
   unsigned short *im16 = (unsigned short *) cimg;
+
+  y = (j / 2) * 2;
+  x = (i / 2) * 2;
 
   return im16[y * cimg_w + x + w];
 }
@@ -851,6 +854,8 @@ static gboolean zwo_ll_timer(gpointer priv)
   if (b) {
     cimg_present = 1;
     ccam->get_pars(cam, &cimg_w, &cimg_h, &cimg_format, &cimg_bpp, NULL, NULL);
+    cimg_w /= ccam->isbin(cam, resolution);
+    cimg_h /= ccam->isbin(cam, resolution);
     cimg_bpp *= 8;
     cimg = b;
     redraw_image(NULL);
@@ -1004,7 +1009,7 @@ int main(int argc, char *argv[])
     }
   }
 
-  if (ccam == &ZWO_CAM) {
+  if (ccam == &ZWO_CAM || ccam == &ZWO_CAMLL) {
     format = ctrls[0].def;
     gain = ctrls[12].def_auto ? 0 : ctrls[12].def;
     exposure = ctrls[13].def_auto ? 0 : ctrls[13].def;

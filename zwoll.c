@@ -65,7 +65,7 @@ static int all_resolutions_x_asi120[] = {
   512,
   480,
   320,
-  640,
+  1280,
 };
 
 static int *resolutions_y;
@@ -80,7 +80,7 @@ static int all_resolutions_y_asi120[] = {
   512,
   320,
   240,
-  480,
+  960,
 };
 
 static int *resolutions_bin;
@@ -113,6 +113,7 @@ static char *NY[] = {
 };
 
 static char *plcks[] = {
+  "25",
   "24",
   "40",
   "48",
@@ -188,7 +189,7 @@ static void *zwoll_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int 
   NEW_CTRL(YAACA_REAL, "start y", 0, *maxh, NULL, 0, 0);	    /* 10 */
   NEW_CTRL(YAACA_ENUM, "resolution", 0, resolutions_n, &resolutions[0], 0, 0); /* 11 */
 
-  NEW_CTRL(YAACA_REAL, "anal gain", 1, 8, NULL, 0, 1); /* 12 */
+  NEW_CTRL(YAACA_REAL, "anal gain", 1, 16, NULL, 0, 1); /* 12 */
   NEW_CTRL(YAACA_REAL, "digi gain", 0, 255, NULL, 0, 0x20); /* 13 */
   NEW_CTRL(YAACA_REAL, "digi gain R", 0, 255, NULL, 0, 0x20); /* 14 */
   NEW_CTRL(YAACA_REAL, "digi gain G1", 0, 255, NULL, 0, 0x20); /* 15 */
@@ -197,7 +198,7 @@ static void *zwoll_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int 
   NEW_CTRL(YAACA_ENUM, "bias sub", 0, 1, &NY[0], 0, 1);	 /* 18 */
   NEW_CTRL(YAACA_ENUM, "row denoise", 0, 1, &NY[0], 0, 1);	 /* 19 */
   NEW_CTRL(YAACA_ENUM, "col denoise", 0, 1, &NY[0], 0, 1);	 /* 20 */
-  NEW_CTRL(YAACA_ENUM, "plck mhz", 0, 6, plcks, 0, 0);	 /* 21 */
+  NEW_CTRL(YAACA_ENUM, "plck mhz", 0, 7, plcks, 0, 0);	 /* 21 */
   NEW_CTRL(YAACA_REAL, "fps", 0, 0, NULL, YAACA_RO, 0); /* 22 */
   NEW_CTRL(YAACA_REAL, "exp us", 0, 1000000000, NULL, 0, 10000); /* 23 */
   NEW_CTRL(YAACA_REAL, "exp min us", 0, 1000000000, NULL, 0, 10000); /* 24 */

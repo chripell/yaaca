@@ -38,8 +38,7 @@
 #define CMD_SET_REG 1
 #define CMD_SEND 2
 
-#define W_EXCESS 450
-#define H_EXCESS 150
+#define H_EXCESS 15
 
 struct cmd_s {
   int cmd;
@@ -90,11 +89,11 @@ static int do_debug;
 static libusb_context *ctx;
 static pthread_mutex_t lk = PTHREAD_MUTEX_INITIALIZER; 
 
-/*                              24  40  48  96   8   2  */
-const uint16_t M_PLL_mul[] =  { 32, 40, 40, 48, 32, 32};
-const uint16_t N_pre_div[] =  { 4,   6,  5,  6,  4,  4};
-const uint16_t P1_sys_div[] = { 4,   2,  2,  1, 12, 24};
-const uint16_t P2_clk_div[] = { 4,   4,  4,  4,  4,  8};
+/*                              25, 24   40  48  96   8   2  */
+const uint16_t M_PLL_mul[] =  { 25, 32,  40, 40, 48, 32, 32};
+const uint16_t N_pre_div[] =  {  3,  4,   6,  5,  6,  4,  4};
+const uint16_t P1_sys_div[] = {  8,  4,   2,  2,  1, 12, 24};
+const uint16_t P2_clk_div[] = {  2,  4,   4,  4,  4,  4,  8};
 
 static struct cmd_s *scmd(struct asill_s *A)
 {
@@ -184,7 +183,7 @@ static void set_reg_mask(struct asill_s *A, int r, int mask, int v)
 
 void calc_min_max_exp(struct asill_s *A)
 {
-  uint16_t tot_w = A->width + W_EXCESS;
+  uint16_t tot_w = 1600;
   uint16_t tot_h = A->height + H_EXCESS;
   double pclk = 48000000.0 * M_PLL_mul[A->pclk] / (N_pre_div[A->pclk] * P1_sys_div[A->pclk] * P2_clk_div[A->pclk]);
 
@@ -196,7 +195,7 @@ void calc_min_max_exp(struct asill_s *A)
 static int setup_frame(struct asill_s *A)
 {
 #define MAX_COARSE 0x2000
-  uint16_t tot_w = A->width + W_EXCESS;
+  uint16_t tot_w = 1600;
   uint16_t tot_h = A->height + H_EXCESS;
   uint16_t coarse, fine;
   double pclk = 48000000.0 * M_PLL_mul[A->pclk] / (N_pre_div[A->pclk] * P1_sys_div[A->pclk] * P2_clk_div[A->pclk]);
@@ -206,17 +205,27 @@ static int setup_frame(struct asill_s *A)
   pr_debug("%s pclk %f exp %u line_us %f\n", __FUNCTION__, pclk, A->exposure_us, line_us);
   pr_debug("%s %dx%d:%d\n", __FUNCTION__, A->width, A->height, A->bin);
 
+#if 1
+  if (A->exposure_us > 100000) {
+    tot_w = 0x2fff;
+    line_us = (tot_w / pclk) * 1000000.0;
+  }
+  coarse = A->exposure_us / line_us;
+#else
   while( (coarse = A->exposure_us / line_us) > MAX_COARSE) {
     tot_w *= 2;
     line_us = (tot_w / pclk) * 1000000.0;
     pr_debug("%s tot_w %d coarse %d line_us %f\n", __FUNCTION__, tot_w, coarse, line_us);
   }
+#endif
   pr_debug("%s finale: tot_w %d coarse %d line_us %f\n", __FUNCTION__, tot_w, coarse, line_us);
   fine_real = A->exposure_us *pclk / 1000000.0 - tot_w * coarse;
   pr_debug("%s fine: %f\n", __FUNCTION__, fine_real);
+  // note: if fine_real is 0 we have similar brightness (if we set the same gain of course!) to ZWO's libASICamera
+  fine_real = 0;
   fine = fine_real;
   A->exposure_real_us = coarse * line_us + fine_real / (pclk / 1000000.0);
-  pr_debug("%s real exp us: %u\n", __FUNCTION__, A->exposure_real_us);
+  pr_debug("%s real exp us: %u (fine %d)\n", __FUNCTION__, A->exposure_real_us, fine);
   
   set_reg(A, MT9M034_FINE_INT_TIME, fine);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
@@ -230,13 +239,13 @@ static int setup_frame(struct asill_s *A)
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
   sleep_ms(A, 201);
   send_ctrl(A, 0xac);
-  set_reg(A, MT9M034_DIGITAL_BINNING, A->bin == 2 ? 0x0003 : 0x0000);
+  set_reg(A, MT9M034_DIGITAL_BINNING, A->bin == 2 ? 0x0022 : 0x0000);
   set_reg(A, MT9M034_Y_ADDR_START, 0x0002 + A->start_y);
   set_reg(A, MT9M034_X_ADDR_START, A->start_x);
   set_reg(A, MT9M034_FRAME_LENGTH_LINES, tot_h);
-  set_reg(A, MT9M034_Y_ADDR_END, 0x0002 + A->start_y + A->height -1);
+  set_reg(A, MT9M034_Y_ADDR_END, 0x0002 + A->start_y + A->height - 1);
   set_reg(A, MT9M034_X_ADDR_END, A->start_x + A->width - 1);
-  set_reg(A, MT9M034_DIGITAL_BINNING, A->bin == 2 ? 0x0003 : 0x0000);
+  set_reg(A, MT9M034_DIGITAL_BINNING, A->bin == 2 ? 0x0022 : 0x0000);
   set_reg(A, 0x306e, 0x9200 | (A->is_color ? 0x10 : 0));
   set_reg(A, MT9M034_LINE_LENGTH_PCK, tot_w);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
@@ -244,8 +253,11 @@ static int setup_frame(struct asill_s *A)
   set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
   set_reg(A, MT9M034_COLUMN_CORRECTION, 0x0000);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
-  /* TODO: this should be proportional to exposure */
+#if 1				/* from DS wait 1 frame for column cor */
+  sleep_ms(A, A->exposure_us / 1000);
+#else
   sleep_ms(A, 51);
+#endif
   set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
   set_reg(A, MT9M034_COLUMN_CORRECTION, 0xe007);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
@@ -384,12 +396,23 @@ static void init(struct asill_s *A)
   set_reg(A, MT9M034_LINE_LENGTH_PCK, 0x056e);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, 0x0473);
 
-  /* unity gain */
+#if 0
+  /* should be gain = 50 */
+  set_reg(A, MT9M034_GLOBAL_GAIN, 0x0024);
+  set_reg(A, MT9M034_DIGITAL_TEST, 0x1330);
+#else
+  /* unity gain digital, minum analog*/
+  set_reg(A, MT9M034_DIGITAL_TEST, 0x1300);
+  set_reg(A, MT9M034_DAC_LD_24_25, 0xd008);
   set_reg(A, MT9M034_RED_GAIN, 0x0020);
   set_reg(A, MT9M034_BLUE_GAIN, 0x0020);
   set_reg(A, MT9M034_GREEN1_GAIN, 0x0020);
   set_reg(A, MT9M034_GREEN2_GAIN, 0x0020);
   set_reg(A, MT9M034_GLOBAL_GAIN, 0x0020);
+#endif
+
+  /* default flip for compatibility with yaaca zwo.c */
+  set_reg(A, MT9M034_READ_MODE, 0x0000);
 
   setup_frame(A);
 
@@ -400,6 +423,13 @@ static void init(struct asill_s *A)
   send_ctrl(A, 0xa9);
 
   pthread_mutex_unlock(&A->cmd_lock);
+}
+
+static void stop(struct asill_s *A)
+{
+  pthread_mutex_lock(&A->cmd_lock);
+  send_ctrl(A, 0xaa);
+  pthread_mutex_unlock(&A->cmd_lock);  
 }
 
 static int diff_us(struct timeval from, struct timeval to)
@@ -415,7 +445,8 @@ static void *worker(void *A_)
     int transfered, ret;
     
     run_q(A);
-    if ((ret = libusb_bulk_transfer(A->h, 0x82, A->d, A->width * A->height * 2 / (A->bin * A->bin), &transfered, 1000)) == 0) {
+    if ((ret = libusb_bulk_transfer(A->h, 0x82, A->d, A->width * A->height * 2 / (A->bin * A->bin),
+				    &transfered, 1000 + (A->exposure_us / 1000))) == 0) {
       struct timeval now;
 
       gettimeofday(&now, NULL);
@@ -444,6 +475,10 @@ static void *worker(void *A_)
     }
     else {
       fprintf(stderr, "bulk transfer failed: %d\n", ret);
+      if (0) {
+	stop(A);
+	init(A);
+      }
     }
   }
   return NULL;
@@ -571,6 +606,7 @@ int asill_set_wh(struct asill_s *A, uint16_t w, uint16_t h, int bin)
   pthread_mutex_lock(&A->cmd_lock);
   setup_frame(A);
   pthread_mutex_unlock(&A->cmd_lock);
+  asill_set_xy(A, A->start_x, A->start_y);
   return 0;
 }
 
@@ -601,12 +637,19 @@ uint16_t asill_get_maxh(struct asill_s *A)
 
 int asill_set_xy(struct asill_s *A, uint16_t x, uint16_t y)
 {
-  if (x + A->width >= A->max_width || y + A->height >= A->max_height)
-    return -1;
+  if (x + A->width > A->max_width) {
+    x = A->max_width - A->width;
+  }
+  if (y + A->height > A->max_height) {
+    y = A->max_height - A->height;
+  }
   A->start_x = x;
   A->start_y = y;
   pthread_mutex_lock(&A->cmd_lock);
-  setup_frame(A);
+  set_reg(A, MT9M034_Y_ADDR_START, 0x0002 + A->start_y);
+  set_reg(A, MT9M034_X_ADDR_START, A->start_x);
+  set_reg(A, MT9M034_Y_ADDR_END, 0x0002 + A->start_y + A->height -1);
+  set_reg(A, MT9M034_X_ADDR_END, A->start_x + A->width - 1);
   pthread_mutex_unlock(&A->cmd_lock);
   return 0;  
 }
@@ -616,18 +659,17 @@ int asill_set_int_par(struct asill_s *A, int par, int gain)
   int ret = 0;
   int a,b;
 
-  fprintf(stderr, "DELME %d=%d\n", par, gain);
   pthread_mutex_lock(&A->cmd_lock);
   switch(par) {
   case ASILL_PAR_ANALOG_GAIN:
-     /* gain from 1 to 8 */
+     /* gain from 1 to 16 */
     gain = gain - 1;
     if (gain < 0)
       gain = 0;
-    if (gain > 7)
-      gain = 7;
-    a = gain / 2;
-    b = (gain & 1) * 3;
+    if (gain > 15)
+      gain = 15;
+    a = gain >> 2;
+    b = gain & 3;
     set_reg_mask(A, 0x30b0, (3 << 4), (a << 4));  
     set_reg_mask(A, 0x3ee4, (3 << 8), (b << 8));  
     break;
