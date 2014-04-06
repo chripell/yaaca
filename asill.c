@@ -277,17 +277,19 @@ static int setup_frame(struct asill_s *A)
   set_reg(A, MT9M034_LINE_LENGTH_PCK, tot_w);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
+#if 0
   set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
   set_reg(A, MT9M034_COLUMN_CORRECTION, 0x0000);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
 #if 1				/* from DS wait 1 frame for column cor */
-  sleep_ms(A, 10 + A->exposure_us / 1000);
+  sleep_ms(A, 10 + 2 * A->exposure_us / 1000);
 #else
   sleep_ms(A, 51);
 #endif
   set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
   set_reg(A, MT9M034_COLUMN_CORRECTION, 0xe007);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
+#endif
 
   calc_min_max_exp(A);
   return 0;
@@ -551,7 +553,6 @@ int asill_load_pars(struct asill_s *A)
   FILE *f;
 
   snprintf(fname, MAX_PATH, "%s/.ASILL_%d_%d", get_home(), A->model, A->n);
-  fprintf(stderr, "DELME %s\n", fname);
   f = fopen(fname, "r");
   if (f) {
     char b[200];
