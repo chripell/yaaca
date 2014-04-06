@@ -269,6 +269,12 @@ static void update_do_capture( GtkWidget *w, gpointer p )
   capture_compress = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_compress));
   capture_blind = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w_capture_blind));
   do_capture = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
+  if (do_capture) {
+    ccam->save_path(cam, dir);
+  }
+  else {
+    ccam->save_path(cam, NULL);
+  }
 }
 
 static void update_blind( GtkWidget *w, gpointer p )

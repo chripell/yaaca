@@ -203,8 +203,10 @@ static void *zwoll_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int 
   NEW_CTRL(YAACA_ENUM, "plck mhz", 0, 7, plcks, 0, 0);	 /* 21 */
   NEW_CTRL(YAACA_REAL, "fps", 0, 0, NULL, YAACA_RO, 0); /* 22 */
   NEW_CTRL(YAACA_REAL, "exp us", 0, 1000000000, NULL, 0, 10000); /* 23 */
+#if 0
   NEW_CTRL(YAACA_REAL, "exp min us", 0, 1000000000, NULL, 0, 10000); /* 24 */
   NEW_CTRL(YAACA_REAL, "exp max us", 0, 1000000000, NULL, 0, 10000); /* 25 */
+#endif
 
   *n_ctrls = nc;
   Z = g_malloc0(sizeof(*Z));
@@ -349,10 +351,42 @@ static void zwoll_pulse (int dir, int n)
 
 static void zwoll_load(void *cam)
 {
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
+  int i;
+
+  if (asill_load_pars(A) == 0) {
+    Z->fmt = c[0].def = asill_get_format(A) == ASILL_FMT_RAW16 ? 0 : 1;
+    for(i = 1; i <= 2; i++) 
+      c[i].def = asill_get_int_par(A, par_maps[i]);
+    c[9].def = asill_get_x(A);
+    c[10].def = asill_get_y(A);
+
+    i = 0;
+    while (resolutions[i]) {
+      if (resolutions_x[i] == asill_get_w(A) && resolutions_y[i] == asill_get_h(A) && resolutions_bin[i] == asill_get_bin(A)) {
+	break;
+      }
+      i++;
+    }
+    if (resolutions[i])
+      Z->res = c[11].def = i;
+    else
+      Z->res = c[11].def = 0;
+
+    for(i = 12; i <= 20; i++) 
+      c[i].def = asill_get_int_par(A, par_maps[i]);  
+    c[21].def = asill_get_pclk(A);
+    c[23].def = asill_get_exp_us(A);
+  }
 }
 
 static void zwoll_save(void *cam)
 {
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
+
+  asill_save_pars(A);
 }
 
 static int zwoll_maxw(void *cam)
@@ -396,7 +430,10 @@ static void zwoll_run(void * cam, int r)
 
 static int zwoll_save_path(void *cam, const char *path)
 {
-  return -1;
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
+
+  return asill_set_save(A, path);
 }
 
 struct yaaca_cam_s ZWO_CAMLL = {

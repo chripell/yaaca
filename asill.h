@@ -80,4 +80,7 @@ void asill_done_buffer(struct asill_s *A);
 int asill_set_save(struct asill_s *A, const char *path);
 float asill_get_fps(struct asill_s *A);
 
+int asill_save_pars(struct asill_s *A);
+int asill_load_pars(struct asill_s *A);
+
 #endif

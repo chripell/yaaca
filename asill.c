@@ -21,6 +21,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <pwd.h>
 
 #include <libusb.h>
 
@@ -51,6 +52,7 @@ struct asill_s {
   pthread_t th;
   volatile int running;
   uint8_t *d;
+  int model, n;
 
   struct cmd_s *cmds;
   size_t max_cmds;
@@ -191,15 +193,18 @@ static void set_reg_mask(struct asill_s *A, int r, int mask, int v)
   set_reg(A, r, nv);
 }
 
-void calc_min_max_exp(struct asill_s *A)
+static void calc_min_max_exp(struct asill_s *A)
 {
+#if 0
   uint16_t tot_w = 1600;
   uint16_t tot_h = A->height + H_EXCESS;
   double pclk = 48000000.0 * M_PLL_mul[A->pclk] / (N_pre_div[A->pclk] * P1_sys_div[A->pclk] * P2_clk_div[A->pclk]);
 
+
   A->exposure_min_us = 1000000.0 * tot_w * tot_h / pclk;
   A->exposure_max_us = 0x8000 * (65535.0 / pclk) * 1000000.0;
   pr_debug("%s exp_us min %u max %u\n", __FUNCTION__, A->exposure_min_us, A->exposure_max_us);
+#endif
 }
 
 static int setup_frame(struct asill_s *A)
@@ -459,6 +464,136 @@ static int diff_us(struct timeval from, struct timeval to)
   return 1000000 * (to.tv_sec - from.tv_sec) + (to.tv_usec - from.tv_usec);
 }
 
+static int save_hdr(struct asill_s *A, const char *fname, time_t now, int usec)
+{
+  FILE *f;
+
+  f = fopen(fname, "w");
+  if (f) {
+    fprintf(f, "0(local datetime):%s", asctime(localtime(&now)));
+    fprintf(f, "1(utc datetime):%s", asctime(gmtime(&now)));
+    fprintf(f, "2(width):%d\n", A->width);
+    fprintf(f, "3(height):%d\n", A->height);
+    fprintf(f, "4(start x):%d\n", A->start_x);
+    fprintf(f, "5(start y):%d\n", A->start_y);
+    fprintf(f, "6(bin):%d\n", A->bin);
+    fprintf(f, "7(fmt):%d\n", A->fmt);
+    fprintf(f, "8(pclk):%d\n", A->pclk);
+    fprintf(f, "9(exposure us):%u\n", A->exposure_us);
+    fprintf(f, "10(T):%f\n", A->T);
+    fprintf(f, "11(analog gain):%d\n", A->pars[ASILL_PAR_ANALOG_GAIN]);
+    fprintf(f, "12(digital gain):%d\n", A->pars[ASILL_PAR_DIGITAL_GAIN]);
+    fprintf(f, "13(digital gain R):%d\n", A->pars[ASILL_PAR_DIGITAL_GAIN_R]);
+    fprintf(f, "14(digital gain G1):%d\n", A->pars[ASILL_PAR_DIGITAL_GAIN_G1]);
+    fprintf(f, "15(digital gain G2):%d\n", A->pars[ASILL_PAR_DIGITAL_GAIN_G2]);
+    fprintf(f, "16(digital gain B):%d\n", A->pars[ASILL_PAR_DIGITAL_GAIN_B]);
+    fprintf(f, "17(bias sub):%d\n", A->pars[ASILL_PAR_BIAS_SUB]);
+    fprintf(f, "18(row denoise):%d\n", A->pars[ASILL_PAR_ROW_DENOISE]);
+    fprintf(f, "19(col denoise):%d\n", A->pars[ASILL_PAR_COL_DENOISE]);
+    fprintf(f, "20(flip x):%d\n", A->pars[ASILL_PAR_FLIP_X]);
+    fprintf(f, "21(flip y):%d\n", A->pars[ASILL_PAR_FLIP_Y]);
+    fprintf(f, "22(time s):%ld\n", now);
+    fprintf(f, "23(time us):%u\n", usec);
+    fclose(f);
+  }
+  else
+    return -1;
+  return 0;
+}
+
+static const char *home;
+
+static const char *get_home(void)
+{
+  if (home)
+    return home;
+
+  home = getenv("HOME");
+  if (!home) {
+    struct passwd *pw = getpwuid(getuid());
+    home = pw->pw_dir;
+  }
+  return home;
+}
+
+int asill_save_pars(struct asill_s *A)
+{
+  char fname[MAX_PATH];
+
+  snprintf(fname, MAX_PATH, "%s/.ASILL_%d_%d", get_home(), A->model, A->n);
+  return save_hdr(A, fname, time(NULL), 0);
+}
+
+static char *get_p(const char *p)
+{
+  char *s = strchr(p, ':');
+
+  if (!s)
+    return s;
+  return &s[1];
+}
+
+int asill_load_pars(struct asill_s *A)
+{
+  char fname[MAX_PATH];
+  FILE *f;
+
+  snprintf(fname, MAX_PATH, "%s/.ASILL_%d_%d", get_home(), A->model, A->n);
+  fprintf(stderr, "DELME %s\n", fname);
+  f = fopen(fname, "r");
+  if (f) {
+    char b[200];
+
+    while(!feof(f)) {
+      if (fgets(b, 200, f)) {
+	int p = atoi(b);
+	const char *vs = get_p(b);
+
+	if (vs) {
+	  int v = atoi(vs);
+
+	  if (p >= 11 && p <= 21) {
+	    asill_set_int_par(A, p - 11, v);
+	  }
+	  else {
+	    switch(p) {
+	    case 2:
+	      A->width = v;
+	      break;
+	    case 3:
+	      A->height = v;
+	      break;
+	    case 4:
+	      A->start_x = v;
+	      break;
+	    case 5:
+	      A->start_y = v;
+	      break;
+	    case 6:
+	      A->bin = v;
+	      break;
+	    case 7:
+	      A->fmt = v;
+	      break;
+	    case 8:
+	      A->pclk = v;
+	      break;
+	    case 9:
+	      A->exposure_us = v;
+	      break;
+	    }
+	  }
+	}
+      }
+    }
+    fclose(f);
+    setup_frame(A);
+  }
+  else
+    return -1;
+  return 0;
+}
+
 static void *worker(void *A_)
 {
   struct asill_s *A = (struct asill_s *) A_;
@@ -494,6 +629,26 @@ static void *worker(void *A_)
 	  A->fps = 1000000.0 / xframe;
 	  A->last_fps_comp = now;
 	  A->fps_n = 0;
+	}
+      }
+      if (A->save_path[0]) {
+	struct timeval tv;
+	char fname[MAX_PATH];
+	FILE *f;
+
+	gettimeofday(&tv, NULL);
+	snprintf(fname, MAX_PATH, "%s/%010lu_%06lu.hdr", A->save_path, tv.tv_sec, tv.tv_usec);
+	save_hdr(A, fname, tv.tv_sec, tv.tv_usec);
+
+	snprintf(fname, MAX_PATH, "%s/%010lu_%06lu.pgm", A->save_path, tv.tv_sec, tv.tv_usec);
+	f = fopen(fname, "w");
+	if (f) {
+	  fprintf(f, "P%d\n%d %d\n%d\n",
+		  5,
+		  A->width, A->height,
+		  A->fmt == ASILL_FMT_RAW16 ? 65535 : 255);
+	  fwrite(A->d, A->width * A->height * (A->fmt == ASILL_FMT_RAW16 ? 2 : 1), 1, f);
+	  fclose(f);
 	}
       }
     }
@@ -562,6 +717,8 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
   libusb_free_device_list(list, 1);
 
   if (A) {
+    A->model = model;
+    A->n = n;
     A->fmt = ASILL_FMT_RAW16;
     A->max_width = 1280;
     A->max_height = 960;
@@ -576,6 +733,8 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
     A->pars[ASILL_PAR_BIAS_SUB] = 1;
     A->pars[ASILL_PAR_ROW_DENOISE] = 1;
     A->pars[ASILL_PAR_COL_DENOISE] = 1;
+    A->pars[ASILL_PAR_FLIP_X] = 0;
+    A->pars[ASILL_PAR_FLIP_Y] = 0;
     A->bin = 1;
     A->cb = cb;
     A->pclk = ASILL_PCLK_25MHZ;
@@ -685,18 +844,19 @@ int asill_set_int_par(struct asill_s *A, int par, int gain)
 {
   int ret = 0;
   int a,b;
+  int ngain;
 
   pthread_mutex_lock(&A->cmd_lock);
   switch(par) {
   case ASILL_PAR_ANALOG_GAIN:
      /* gain from 1 to 16 */
-    gain = gain - 1;
-    if (gain < 0)
-      gain = 0;
-    if (gain > 15)
-      gain = 15;
-    a = gain >> 2;
-    b = gain & 3;
+    ngain = gain - 1;
+    if (ngain < 0)
+      ngain = 0;
+    if (ngain > 15)
+      ngain = 15;
+    a = ngain >> 2;
+    b = ngain & 3;
     set_reg_mask(A, 0x30b0, (3 << 4), (a << 4));  
     set_reg_mask(A, 0x3ee4, (3 << 8), (b << 8));  
     break;
