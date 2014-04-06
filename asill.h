@@ -83,4 +83,10 @@ float asill_get_fps(struct asill_s *A);
 int asill_save_pars(struct asill_s *A);
 int asill_load_pars(struct asill_s *A);
 
+#define ASILL_N 0
+#define ASILL_S 1
+#define ASILL_E 2
+#define ASILL_W 3
+void asill_pulse(struct asill_s *A, int dir, int ms);
+
 #endif

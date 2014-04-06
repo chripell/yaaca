@@ -345,8 +345,12 @@ static void zwoll_get_pars(void *cam, int *w, int *h, int *format, int *Bpp, int
     *sy = asill_get_y(A);
 }
 
-static void zwoll_pulse (int dir, int n)
+static void zwoll_pulse (void *cam, int dir, int n)
 {
+  struct zwoll_s *Z = (struct zwoll_s *) cam;
+  struct asill_s *A = Z->A;
+
+  asill_pulse(A, dir, n);
 }
 
 static void zwoll_load(void *cam)

@@ -636,7 +636,7 @@ static void zwo_get_pars(void *cam, int *w, int *h, int *format, int *Bpp, int *
   if (sy) *sy = z->starty;
 }
 
-static void zwo_pulse (int dir, int n)
+static void zwo_pulse (void *cam, int dir, int n)
 {
   //fprintf(stderr, "PULSE %d %d\n", dir, n);
   pulseGuide(dir, n);

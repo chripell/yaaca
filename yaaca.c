@@ -720,7 +720,7 @@ static void pulse_press( GtkWidget *widget, gpointer data )
 {
   long dir = (long) data;
 
-  ccam->pulse(dir, atoi(gtk_entry_get_text(GTK_ENTRY(pulse_n))));
+  ccam->pulse(cam, dir, atoi(gtk_entry_get_text(GTK_ENTRY(pulse_n))));
 }
 
 static GtkWidget *create_ctrl(struct yaaca_ctrl *ctrl, int i, GtkWidget **ctrl_val, GtkWidget **ctrl_auto)
@@ -840,13 +840,13 @@ static GtkWidget *create_check(char *c, GCallback cb)
   return e;
 }
 
-static GtkWidget *create_button(char *c, int w, int h, GCallback cb)
+static GtkWidget *create_button(char *c, int w, int h, GCallback cb, int priv)
 {
   static GtkWidget *b;
 
   b = gtk_button_new_with_label (c);
   if (cb) {
-    g_signal_connect (b, "clicked", cb, (gpointer) 0);
+    g_signal_connect (b, "clicked", cb, (gpointer) priv);
   }
   gtk_widget_show(b);
   gtk_widget_set_size_request(b, w, h);
@@ -1037,10 +1037,10 @@ int main(int argc, char *argv[])
   gtk_box_pack_start(GTK_BOX (capture_box), box, TRUE, TRUE, 0);
 
   pulse_table = gtk_table_new(3, 3, TRUE);
-  gtk_table_attach_defaults (GTK_TABLE (pulse_table), create_button("N", 30, -1, G_CALLBACK (pulse_press)), 1, 2, 0, 1);
-  gtk_table_attach_defaults (GTK_TABLE (pulse_table), create_button("S", 30, -1, G_CALLBACK (pulse_press)), 1, 2, 2, 3);
-  gtk_table_attach_defaults (GTK_TABLE (pulse_table), create_button("E", 30, -1, G_CALLBACK (pulse_press)), 0, 1, 1, 2);
-  gtk_table_attach_defaults (GTK_TABLE (pulse_table), create_button("W", 30, -1, G_CALLBACK (pulse_press)), 2, 3, 1, 2);
+  gtk_table_attach_defaults (GTK_TABLE (pulse_table), create_button("N", 30, -1, G_CALLBACK (pulse_press), YAACA_N), 1, 2, 0, 1);
+  gtk_table_attach_defaults (GTK_TABLE (pulse_table), create_button("S", 30, -1, G_CALLBACK (pulse_press), YAACA_S), 1, 2, 2, 3);
+  gtk_table_attach_defaults (GTK_TABLE (pulse_table), create_button("E", 30, -1, G_CALLBACK (pulse_press), YAACA_E), 0, 1, 1, 2);
+  gtk_table_attach_defaults (GTK_TABLE (pulse_table), create_button("W", 30, -1, G_CALLBACK (pulse_press), YAACA_W), 2, 3, 1, 2);
   gtk_table_attach_defaults (GTK_TABLE (pulse_table), create_entry(NULL, &pulse_n, "1", NULL, 4, 4), 1, 2, 1, 2);
   gtk_box_pack_start(GTK_BOX (right), pulse_table, FALSE, FALSE, 1);
   gtk_widget_show(pulse_table);

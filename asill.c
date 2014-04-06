@@ -125,6 +125,18 @@ static void send_ctrl(struct asill_s *A, int v)
   c = scmd(A);
   c->cmd = CMD_SEND;
   c->p1 = v;
+  c->p2 = 0;
+}
+
+static void send_ctrl_val(struct asill_s *A, int v, int v1)
+{
+  struct cmd_s *c;
+
+  pr_debug("%s 0x%04x 0x%04d\n", __FUNCTION__, v, v1);
+  c = scmd(A);
+  c->cmd = CMD_SEND;
+  c->p1 = v;
+  c->p2 = v1;
 }
 
 static void set_reg(struct asill_s *A, int r, int v)
@@ -157,7 +169,7 @@ static void run_q(struct asill_s *A)
       ret = libusb_control_transfer(A->h, 0x40, 0xa6, c->p1, c->p2, NULL, 0, 1000);
       break;
     case CMD_SEND:
-      ret = libusb_control_transfer(A->h, 0x40, c->p1 & 0xff, 0, 0, NULL, 0, 1000);
+      ret = libusb_control_transfer(A->h, 0x40, c->p1 & 0xff, c->p2, 0, NULL, 0, 1000);
       break;
     default:
       assert(0);
@@ -977,4 +989,13 @@ uint16_t asill_get_y(struct asill_s *A)
 int asill_get_format(struct asill_s *A)
 {
   return A->fmt;
+}
+
+void asill_pulse(struct asill_s *A, int dir, int ms)
+{
+  pthread_mutex_lock(&A->cmd_lock);
+  send_ctrl_val(A, 0xb0, dir);
+  sleep_ms(A, ms);
+  send_ctrl_val(A, 0xb1, dir);
+  pthread_mutex_unlock(&A->cmd_lock);
 }
