@@ -83,7 +83,7 @@ struct asill_s {
 
   char save_path[MAX_PATH];
 
-  float Tk, T0;
+  float Tk, T0, T;
 };
 
 static int do_debug;
@@ -427,7 +427,11 @@ static void init(struct asill_s *A)
   set_reg(A, MT9M034_GLOBAL_GAIN, 0x0020);
 #endif
 
-  
+  /* read temperature coefficents */
+  T70 = get_reg_r(A, 0x30c6) & 0x7ff;
+  T55 = get_reg_r(A, 0x30c8) & 0x7ff;
+  A->Tk = (70.0 - 55.0) / (T70 - T55);
+  A->T0 = 55.0 - A->Tk * T55;
 
   /* default flip for compatibility with yaaca zwo.c */
   set_reg(A, MT9M034_READ_MODE, 0x0000);
@@ -463,6 +467,7 @@ static void *worker(void *A_)
     int transfered, ret;
     
     run_q(A);
+    A->T = (get_reg_r(A, 0x30b2) & 0x7ff) * A->Tk + A->T0;
     if ((ret = libusb_bulk_transfer(A->h, 0x82, A->d,
 				    A->width * A->height * (A->fmt == ASILL_FMT_RAW16 ? 2 : 1) / (A->bin * A->bin),
 				    &transfered, 1000 + (A->exposure_us / 1000))) == 0) {
@@ -773,8 +778,7 @@ uint32_t asill_get_max_exp_us(struct asill_s *A)
 
 float asill_get_temp(struct asill_s *A)
 {
-  //fprintf(stderr, "%s: TODO\n", __FUNCTION__);
-  return 0.0;
+  return A->T;
 }
 
 int asill_is_color(struct asill_s *A)
