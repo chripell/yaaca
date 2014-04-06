@@ -82,6 +82,8 @@ struct asill_s {
   uint32_t exposure_max_us;
 
   char save_path[MAX_PATH];
+
+  float Tk, T0;
 };
 
 static int do_debug;
@@ -164,6 +166,14 @@ static void run_q(struct asill_s *A)
   }
   A->n_cmds = 0;
   pthread_mutex_unlock(&A->cmd_lock);
+}
+
+static int get_reg_r(struct asill_s *A, int r)
+{
+  unsigned char data[2] = {0,0};
+
+  libusb_control_transfer(A->h, 0xc0, 0xa7, r, 0, data, 2, 1000);
+  return data[0] * 256 + data[1];
 }
 
 static int get_reg(struct asill_s *A, int r)
@@ -268,6 +278,8 @@ static int setup_frame(struct asill_s *A)
 
 static void init(struct asill_s *A)
 {
+  float T55, T70;
+
   pthread_mutex_lock(&A->cmd_lock);
 
   send_ctrl(A, 0xa4);
@@ -414,6 +426,8 @@ static void init(struct asill_s *A)
   set_reg(A, MT9M034_GREEN2_GAIN, 0x0020);
   set_reg(A, MT9M034_GLOBAL_GAIN, 0x0020);
 #endif
+
+  
 
   /* default flip for compatibility with yaaca zwo.c */
   set_reg(A, MT9M034_READ_MODE, 0x0000);
