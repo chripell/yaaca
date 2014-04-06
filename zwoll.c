@@ -34,6 +34,7 @@ static struct yaaca_ctrl *c;
 
 struct zwoll_s {
   int res;
+  int fmt;
   struct asill_s *A;
 };
 
@@ -102,9 +103,10 @@ static int resolutions_n;
 
 static char *all_formats[] = {
   "RAW16",
+  "RAW8",
   NULL,
 };
-static int n_formats = 1;
+static int n_formats = 2;
 
 static char *NY[] = {
   "no",
@@ -206,11 +208,14 @@ static void *zwoll_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int 
 
   *n_ctrls = nc;
   Z = g_malloc0(sizeof(*Z));
+  Z->fmt = ASILL_FMT_RAW16;
   Z->A = A;
   return Z;
 }
 
 static int par_maps[] = {
+  [1] = ASILL_PAR_FLIP_X,
+  [2] = ASILL_PAR_FLIP_Y,
   [12] = ASILL_PAR_ANALOG_GAIN,
   [13] = ASILL_PAR_DIGITAL_GAIN,
   [14] = ASILL_PAR_DIGITAL_GAIN_R,
@@ -228,6 +233,10 @@ static int zwoll_set(void * cam, int ctrl, double val, int autov)
   struct asill_s *A = Z->A;
 
   switch(ctrl) {
+  case 0:
+    Z->fmt = val ? ASILL_FMT_RAW8 : ASILL_FMT_RAW16;
+    asill_set_wh(A, resolutions_x[Z->res], resolutions_y[Z->res], resolutions_bin[Z->res], Z->fmt);
+    break;
   case 9:
     asill_set_xy(A, val, asill_get_y(A));
     break;
@@ -236,8 +245,10 @@ static int zwoll_set(void * cam, int ctrl, double val, int autov)
     break;
   case 11:
     Z->res = val;
-    asill_set_wh(A, resolutions_x[(int)val], resolutions_y[(int)val], resolutions_bin[(int)val]);
+    asill_set_wh(A, resolutions_x[Z->res], resolutions_y[Z->res], resolutions_bin[Z->res], Z->fmt);
     break;
+  case 1:
+  case 2:
   case 12:
   case 13:
   case 14:
@@ -267,7 +278,7 @@ static double zwoll_get(void * cam, int ctrl)
 
   switch(ctrl) {
   case 0:
-    return YAACA_FMT_RAW16;
+    return asill_get_format(A);
   case 3:
     return asill_get_temp(A);
   case 8:
@@ -278,6 +289,8 @@ static double zwoll_get(void * cam, int ctrl)
     return asill_get_y(A);
   case 11:
     return Z->res;
+  case 1:
+  case 2:
   case 12:
   case 13:
   case 14:
@@ -321,7 +334,7 @@ static void zwoll_get_pars(void *cam, int *w, int *h, int *format, int *Bpp, int
   if (h)
     *h = asill_get_h(A);
   if (format)
-    *format = YAACA_FMT_RAW16;
+    *format = asill_get_format(A);
   if (Bpp)
     *Bpp = 2;
   if (sx)

@@ -73,7 +73,7 @@ struct asill_s {
   uint16_t height;
   uint16_t start_x;
   uint16_t start_y;
-  int bin;
+  int bin, fmt;
 
   uint32_t pclk;
   uint32_t exposure_us;
@@ -238,7 +238,7 @@ static int setup_frame(struct asill_s *A)
   sleep_ms(A, 11);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
   sleep_ms(A, 201);
-  send_ctrl(A, 0xac);
+  send_ctrl(A, A->fmt == ASILL_FMT_RAW8 ? 0xab : 0xac);
   set_reg(A, MT9M034_DIGITAL_BINNING, A->bin == 2 ? 0x0022 : 0x0000);
   set_reg(A, MT9M034_Y_ADDR_START, 0x0002 + A->start_y);
   set_reg(A, MT9M034_X_ADDR_START, A->start_x);
@@ -254,7 +254,7 @@ static int setup_frame(struct asill_s *A)
   set_reg(A, MT9M034_COLUMN_CORRECTION, 0x0000);
   set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
 #if 1				/* from DS wait 1 frame for column cor */
-  sleep_ms(A, A->exposure_us / 1000);
+  sleep_ms(A, 10 + A->exposure_us / 1000);
 #else
   sleep_ms(A, 51);
 #endif
@@ -367,7 +367,10 @@ static void init(struct asill_s *A)
   set_reg(A, MT9M034_DAC_LD_16_17, 0x0070);
   set_reg(A, MT9M034_DARK_CONTROL, 0x0404);
   set_reg(A, MT9M034_DAC_LD_26_27, 0x8303);
-  set_reg(A, MT9M034_DAC_LD_24_25, 0xd308);
+  // note: was set_reg(A, MT9M034_DAC_LD_24_25, 0xd308);
+  // in driver, but DS says put low conversion gain for
+  // column correction calibration.
+  set_reg(A, MT9M034_DAC_LD_24_25, 0xd008);
   set_reg(A, MT9M034_DAC_LD_10_11, 0x00bd);
   set_reg(A, MT9M034_DAC_LD_26_27, 0x8303);
   set_reg(A, MT9M034_ADC_BITS_6_7, 0x6372);
@@ -398,6 +401,7 @@ static void init(struct asill_s *A)
 
 #if 0
   /* should be gain = 50 */
+  set_reg(A, MT9M034_DAC_LD_24_25, 0xd308);
   set_reg(A, MT9M034_GLOBAL_GAIN, 0x0024);
   set_reg(A, MT9M034_DIGITAL_TEST, 0x1330);
 #else
@@ -445,13 +449,14 @@ static void *worker(void *A_)
     int transfered, ret;
     
     run_q(A);
-    if ((ret = libusb_bulk_transfer(A->h, 0x82, A->d, A->width * A->height * 2 / (A->bin * A->bin),
+    if ((ret = libusb_bulk_transfer(A->h, 0x82, A->d,
+				    A->width * A->height * (A->fmt == ASILL_FMT_RAW16 ? 2 : 1) / (A->bin * A->bin),
 				    &transfered, 1000 + (A->exposure_us / 1000))) == 0) {
       struct timeval now;
 
       gettimeofday(&now, NULL);
       if (A->data && !A->data_ready) {
-	memcpy(A->data, A->d, A->width * A->height * 2 / (A->bin * A->bin));
+	memcpy(A->data, A->d, A->width * A->height * (A->fmt == ASILL_FMT_RAW16 ? 2 : 1) / (A->bin * A->bin));
 	A->data_ready = 1;
       }
       if (A->cb) {
@@ -538,6 +543,7 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
   libusb_free_device_list(list, 1);
 
   if (A) {
+    A->fmt = ASILL_FMT_RAW16;
     A->max_width = 1280;
     A->max_height = 960;
     A->width = A->max_width;
@@ -553,7 +559,7 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
     A->pars[ASILL_PAR_COL_DENOISE] = 1;
     A->bin = 1;
     A->cb = cb;
-    A->pclk = ASILL_PCLK_24MHZ;
+    A->pclk = ASILL_PCLK_25MHZ;
     A->exposure_us = 10000;
     A->start_x = 0;
     A->start_y = 0;
@@ -598,11 +604,13 @@ int asill_get_pclk(struct asill_s *A)
   return A->pclk;
 }
 
-int asill_set_wh(struct asill_s *A, uint16_t w, uint16_t h, int bin)
+int asill_set_wh(struct asill_s *A, uint16_t w, uint16_t h, int bin, int fmt)
 {
+  pr_debug("%s: %dx%d bin %d fmt %d\n", __FUNCTION__, w, h, bin, fmt);
   A->width = w;
   A->height = h;
   A->bin = bin;
+  A->fmt = fmt;
   pthread_mutex_lock(&A->cmd_lock);
   setup_frame(A);
   pthread_mutex_unlock(&A->cmd_lock);
@@ -689,20 +697,30 @@ int asill_set_int_par(struct asill_s *A, int par, int gain)
     set_reg(A, MT9M034_BLUE_GAIN, gain);
     break;
   case ASILL_PAR_BIAS_SUB:
-    set_reg_mask(A, 0x30ea, (1 << 15), gain ? (1 << 15) : 0);  
+    set_reg_mask(A, 0x30ea, (1 << 15), gain ? 0 : (1 << 15));  
     break;
   case ASILL_PAR_ROW_DENOISE:
     set_reg_mask(A, 0x3044, (1 << 10), gain ? (1 << 10) : 0);  
     break;
   case ASILL_PAR_COL_DENOISE:
-    set_reg_mask(A, 0x30d3, (1 << 15), gain ? (1 << 15) : 0);  
+    set_reg_mask(A, 0x30d4, (1 << 15), gain ? (1 << 15) : 0);  
+    break;
+  case ASILL_PAR_FLIP_X:
+    set_reg_mask(A, 0x3040, (1 << 14), gain ? (1 << 14) : 0);
+    break;
+  case ASILL_PAR_FLIP_Y:
+    set_reg_mask(A, 0x3040, (1 << 15), gain ? (1 << 15) : 0);
     break;
   default:
     ret = -1;
   }
   pthread_mutex_unlock(&A->cmd_lock);
-  if (ret == 0)
+  if (ret == 0) {
     A->pars[par] = gain;
+    if (par == ASILL_PAR_FLIP_X || par == ASILL_PAR_FLIP_Y) {
+      setup_frame(A);
+    }
+  }
   return ret;
 }
 
@@ -776,4 +794,9 @@ uint16_t asill_get_x(struct asill_s *A)
 uint16_t asill_get_y(struct asill_s *A)
 {
   return A->start_y;
+}
+
+int asill_get_format(struct asill_s *A)
+{
+  return A->fmt;
 }

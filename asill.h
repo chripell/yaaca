@@ -39,7 +39,9 @@ struct asill_s *asill_new(uint16_t model, int n, int has_buffer, asill_new_frame
 int asill_sel_pclk(struct asill_s *A, int pclk);
 int asill_get_pclk(struct asill_s *A);
 
-int asill_set_wh(struct asill_s *A, uint16_t w, uint16_t h, int bin);
+#define ASILL_FMT_RAW8 0
+#define ASILL_FMT_RAW16 2
+int asill_set_wh(struct asill_s *A, uint16_t w, uint16_t h, int bin, int fmt);
 uint16_t asill_get_w(struct asill_s *A);
 uint16_t asill_get_h(struct asill_s *A);
 int asill_get_bin(struct asill_s *A);
@@ -48,6 +50,7 @@ uint16_t asill_get_maxh(struct asill_s *A);
 int asill_set_xy(struct asill_s *A, uint16_t x, uint16_t y);
 uint16_t asill_get_x(struct asill_s *A);
 uint16_t asill_get_y(struct asill_s *A);
+int asill_get_format(struct asill_s *A);
 
 #define ASILL_PAR_ANALOG_GAIN 0
 #define ASILL_PAR_DIGITAL_GAIN 1
@@ -58,7 +61,9 @@ uint16_t asill_get_y(struct asill_s *A);
 #define ASILL_PAR_BIAS_SUB 6
 #define ASILL_PAR_ROW_DENOISE 7
 #define ASILL_PAR_COL_DENOISE 8
-#define ASILL_PAR_N 9
+#define ASILL_PAR_FLIP_X 9
+#define ASILL_PAR_FLIP_Y 10
+#define ASILL_PAR_N 11
 int asill_set_int_par(struct asill_s *A, int par, int gain);
 int asill_get_int_par(struct asill_s *A, int par);
 
