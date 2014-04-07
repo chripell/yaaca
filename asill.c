@@ -219,6 +219,22 @@ static void calc_min_max_exp(struct asill_s *A)
 #endif
 }
 
+static void restore_rnc(struct asill_s *A)
+{
+  return;			/* doesn't work */
+  set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
+  set_reg(A, MT9M034_COLUMN_CORRECTION, 0x0000);
+  set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
+#if 1				/* from DS wait 1 frame for column cor */
+  sleep_ms(A, 10 + 2 * A->exposure_us / 1000);
+#else
+  sleep_ms(A, 51);
+#endif
+  set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
+  set_reg(A, MT9M034_COLUMN_CORRECTION, 0xe007);
+  set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
+}
+
 static int setup_frame(struct asill_s *A)
 {
 #define MAX_COARSE 0x2000
@@ -278,17 +294,7 @@ static int setup_frame(struct asill_s *A)
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
 #if 0
-  set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
-  set_reg(A, MT9M034_COLUMN_CORRECTION, 0x0000);
-  set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
-#if 1				/* from DS wait 1 frame for column cor */
-  sleep_ms(A, 10 + 2 * A->exposure_us / 1000);
-#else
-  sleep_ms(A, 51);
-#endif
-  set_reg(A, MT9M034_RESET_REGISTER, 0x10d8);
-  set_reg(A, MT9M034_COLUMN_CORRECTION, 0xe007);
-  set_reg(A, MT9M034_RESET_REGISTER, 0x10dc);
+  restore_rnc(A);
 #endif
 
   calc_min_max_exp(A);
@@ -567,6 +573,7 @@ int asill_load_pars(struct asill_s *A)
 
 	  if (p >= 11 && p <= 21) {
 	    asill_set_int_par(A, p - 11, v);
+	    if (p == 16 || p == 17) sleep(1); /* without this column denoise is killed if row and bias cor are saved off */
 	  }
 	  else {
 	    switch(p) {
@@ -909,8 +916,14 @@ int asill_set_int_par(struct asill_s *A, int par, int gain)
   pthread_mutex_unlock(&A->cmd_lock);
   if (ret == 0) {
     A->pars[par] = gain;
+    if (par == ASILL_PAR_DIGITAL_GAIN) {
+      A->pars[ASILL_PAR_DIGITAL_GAIN_R] = gain;
+      A->pars[ASILL_PAR_DIGITAL_GAIN_G1] = gain;
+      A->pars[ASILL_PAR_DIGITAL_GAIN_G2] = gain;
+      A->pars[ASILL_PAR_DIGITAL_GAIN_B] = gain;
+    }
     if (par == ASILL_PAR_FLIP_X || par == ASILL_PAR_FLIP_Y) {
-      setup_frame(A);
+      restore_rnc(A);
     }
   }
   return ret;
