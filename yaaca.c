@@ -379,26 +379,6 @@ static void update_zoom( GtkWidget *w, int n)
   }
 }
 
-static int get_raw8_pix(int i, int j, int w)
-{
-  int y = (j / 2) * 2;
-  int x = (i / 2) * 2;
-
-  return cimg[y * cimg_w + x + w];
-}
-
-static int get_raw16_pix(int i, int j, int w)
-{
-  int y;
-  int x;
-  unsigned short *im16 = (unsigned short *) cimg;
-
-  y = (j / 2) * 2;
-  x = (i / 2) * 2;
-
-  return im16[y * cimg_w + x + w];
-}
-
 static gboolean redraw_fps(gpointer user_data)
 {
   char stat[200];
@@ -449,15 +429,29 @@ static gboolean redraw_image(gpointer user_data)
     }
     else if (cimg_format == YAACA_FMT_RAW8) { 
       if (ccam->get(cam, 8)) {
-	for(j = 0; j < cimg_h; j++)
-	  for(i = 0; i < cimg_w; i++) {
-	    int z = 3 * (j * cimg_w + i);
+#define IM(x, y) cimg[(x) + (y) * cimg_w]
 
-	    /* TODO: serious debayer, gamma */
-	    o[z + 0] = get_raw8_pix(i, j, 1);
-	    o[z + 1] = get_raw8_pix(i, j, 0);
-	    o[z + 2] = get_raw8_pix(i, j, 2);
+	for(j = 0; j < cimg_h; j += 2) {
+	  for(i = 0; i < cimg_w; i += 2) {
+	    unsigned char R = IM(i+1,j);
+	    unsigned char G1 = IM(i,j);
+	    unsigned char G2 = IM(i+1,j+1);
+	    unsigned char B = IM(i,j+1);
+	    PXY(i,j,0) = R;
+	    PXY(i,j,1) = G1;
+	    PXY(i,j,2) = B;
+	    PXY(i+1,j,0) = R;
+	    PXY(i+1,j,1) = G1;
+	    PXY(i+1,j,2) = B;
+	    PXY(i,j+1,0) = R;
+	    PXY(i,j+1,1) = G2;
+	    PXY(i,j+1,2) = B;
+	    PXY(i+1,j+1,0) = R;
+	    PXY(i+1,j+1,1) = G2;
+	    PXY(i+1,j+1,2) = B;
+#undef IM
 	  }
+	}
       }
       else {
 	for (i = 0; i < cimg_w * cimg_h; i++) {
@@ -469,15 +463,30 @@ static gboolean redraw_image(gpointer user_data)
     }
     else if (cimg_format == YAACA_FMT_RAW16) {
       if (ccam->get(cam, 8)) {
-	for(j = 0; j < cimg_h; j++)
-	  for(i = 0; i < cimg_w; i++) {
-	    int z = 3 * (j * cimg_w + i);
+	unsigned short *im16 = (unsigned short *) cimg;
+#define IM(x, y) im16[(x) + (y) * cimg_w]
 
-	    /* TODO: serious debayer, gamma */
-	    o[z + 0] = get_raw16_pix(i, j, 1);
-	    o[z + 1] = get_raw16_pix(i, j, 0);
-	    o[z + 2] = get_raw16_pix(i, j, 2);
+	for(j = 0; j < cimg_h; j += 2) {
+	  for(i = 0; i < cimg_w; i += 2) {
+	    unsigned char R = IM(i+1,j);
+	    unsigned char G1 = IM(i,j);
+	    unsigned char G2 = IM(i+1,j+1);
+	    unsigned char B = IM(i,j+1);
+	    PXY(i,j,0) = R;
+	    PXY(i,j,1) = G1;
+	    PXY(i,j,2) = B;
+	    PXY(i+1,j,0) = R;
+	    PXY(i+1,j,1) = G1;
+	    PXY(i+1,j,2) = B;
+	    PXY(i,j+1,0) = R;
+	    PXY(i,j+1,1) = G2;
+	    PXY(i,j+1,2) = B;
+	    PXY(i+1,j+1,0) = R;
+	    PXY(i+1,j+1,1) = G2;
+	    PXY(i+1,j+1,2) = B;
+#undef IM
 	  }
+	}
       }
       else {
 	unsigned short *s = (unsigned short *) cimg;

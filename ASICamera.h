@@ -2,6 +2,7 @@
 #ifndef ASICAMERA_H
 #define ASICAMERA_H
 
+
 #ifdef _WINDOWS
 	#define ASICAMERA_API __declspec(dllexport)
 #elif defined _LIN
@@ -19,7 +20,7 @@ enum CAMERA_TYPE{ //Camera Type
 	CAMERA_UNKNOWN
 };
 
-enum Control_TYPE{ //Control ID
+enum Control_TYPE{ //Control ID//
 	CONTROL_GAIN = 0,
 	CONTROL_EXPOSURE,
 	CONTROL_GAMMA,
