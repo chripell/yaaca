@@ -2,8 +2,13 @@ CC=gcc
 CFLAGS=$(shell pkg-config --cflags gtk+-2.0 libusb-1.0) -I. -g -O2 -Wall -D_LIN -pthread
 LDFLAGS=SDK/libASICamera.a $(shell pkg-config --libs gtk+-2.0 libusb-1.0) -lstdc++ -lm -g -pthread
 
+all: yaaca asill.so
+
 yaaca: zwo.o yaaca.o zwoll.o asill.o
 	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+asill.so: asill.c
+	gcc $(CFLAGS) -fPIC -shared -o $@ asill.c $(LDFLAGS)
 
 zwo.o: zwo.c yaaca.h
 
