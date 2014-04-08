@@ -289,7 +289,8 @@ static int setup_frame(struct asill_s *A)
   set_reg(A, MT9M034_Y_ADDR_END, 0x0002 + A->start_y + A->height - 1);
   set_reg(A, MT9M034_X_ADDR_END, A->start_x + A->width - 1);
   set_reg(A, MT9M034_DIGITAL_BINNING, A->bin == 2 ? 0x0022 : 0x0000);
-  set_reg(A, 0x306e, 0x9200 | (A->is_color ? 0x10 : 0));
+  set_reg(A, 0x306e, 0x9200);
+  //set_reg(A, 0x306e, 0x9200 | (A->is_color ? 0x10 : 0));
   set_reg(A, MT9M034_LINE_LENGTH_PCK, tot_w);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
   set_reg(A, MT9M034_COARSE_INTEGRATION_TIME, coarse);
