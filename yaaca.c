@@ -840,7 +840,7 @@ static GtkWidget *create_check(char *c, GCallback cb)
   return e;
 }
 
-static GtkWidget *create_button(char *c, int w, int h, GCallback cb, int priv)
+static GtkWidget *create_button(char *c, int w, int h, GCallback cb, long priv)
 {
   static GtkWidget *b;
 
