@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import asill as A
+import pyasill as A
 
 print A.ASILL_ASI120MM
 
