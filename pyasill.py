@@ -37,6 +37,9 @@ _asill_vars = {'ASILL_ASI120MC': 4619,
 _asill_funcs = {'asill_buffer2float': (['int'],
                         (('A', ['struct asill_s', '*'], None),
                          ('fb', ['float', '*'], None))),
+                'asill_buffer2buffer': (['int'],
+                        (('A', ['struct asill_s', '*'], None),
+                         ('b', ['void', '*'], None))),
  'asill_done_buffer': (['void'], (('A', ['struct asill_s', '*'], None),)),
  'asill_get_bin': (['int'], (('A', ['struct asill_s', '*'], None),)),
  'asill_get_buffer': (['uint8_t', '*'],
@@ -157,10 +160,31 @@ for k,v in _asill_funcs.iteritems():
         a.append(c2p(i[1]))
     _lib[k].argtypes = a
 
+_requires = ('C', 'W', 'A')
+
 class Cam(object):
     def __init__(self, model, n):
         self.c = _lib.asill_new(model, n, 1, None)
         if not self.c:
-            raise Exception("ASICam not found")
-    
-
+            raise Exception("ASICam not found")    
+    def __getattr__(self, name):
+        return lambda *args, **kwargs: _lib["asill_" + name](self.c, *args, **kwargs)
+    def get_frame(self, as_float = False):
+        if not _lib.asill_get_buffer(self.c):
+            return None
+        if as_float:
+            dt = np.float32
+        else:
+            if _lib.asill_get_format(self.c) == ASILL_FMT_RAW16:
+                dt = ">u2"
+            else:
+                dt = np.uint8
+        x = np.empty([_lib.asill_get_h(self.c),
+                      _lib.asill_get_w(self.c)],
+                     dtype = dt)
+        x = np.require(x, dt, _requires)
+        if as_float:
+            _lib.asill_buffer2float(self.c, c_void_p(x.ctypes.data))
+        else:
+            _lib.asill_buffer2buffer(self.c, c_void_p(x.ctypes.data))
+        return x

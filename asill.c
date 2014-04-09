@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <pwd.h>
-
+#include <arpa/inet.h>
 #include <libusb.h>
 
 #include "asill.h"
@@ -1026,7 +1026,7 @@ int asill_buffer2float(struct asill_s *A, float *fb)
     uint16_t *p = (uint16_t *) A->d;
 
     for(i = 0; i < n; i++)
-      *fb++ = *p++;
+      *fb++ = ntohs(*p++);
   }
   else {
     uint8_t *p = (uint8_t *) A->d;
@@ -1034,6 +1034,17 @@ int asill_buffer2float(struct asill_s *A, float *fb)
     for(i = 0; i < n; i++)
       *fb++ = *p++;
   }
+  A->data_ready = 0;
+  return n;
+}
+
+int asill_buffer2buffer(struct asill_s *A, void *fb)
+{
+  int n = A->width * A->height;
+
+  if (!A->data_ready)
+    return 0;
+  memcpy(fb, A->d, n * (A->fmt == ASILL_FMT_RAW16 ? 2 : 1));
   A->data_ready = 0;
   return n;
 }

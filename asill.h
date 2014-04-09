@@ -78,6 +78,7 @@ int asill_is_color(struct asill_s *A);
 uint8_t *asill_get_buffer(struct asill_s *A);
 void asill_done_buffer(struct asill_s *A);
 int asill_buffer2float(struct asill_s *A, float *fb);
+int asill_buffer2buffer(struct asill_s *A, void *b);
 int asill_set_save(struct asill_s *A, const char *path);
 float asill_get_fps(struct asill_s *A);
 

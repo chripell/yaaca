@@ -6,4 +6,5 @@ yaaca
 *.deb
 *.so
 *.pyc
+*.png
 
