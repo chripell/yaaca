@@ -1014,3 +1014,26 @@ void asill_pulse(struct asill_s *A, int dir, int ms)
   send_ctrl_val(A, 0xb1, dir);
   pthread_mutex_unlock(&A->cmd_lock);
 }
+
+int asill_buffer2float(struct asill_s *A, float *fb)
+{
+  int i;
+  int n = A->width * A->height;
+  
+  if (!A->data_ready)
+    return 0;
+  if (A->fmt == ASILL_FMT_RAW16) {
+    uint16_t *p = (uint16_t *) A->d;
+
+    for(i = 0; i < n; i++)
+      *fb++ = *p++;
+  }
+  else {
+    uint8_t *p = (uint8_t *) A->d;
+
+    for(i = 0; i < n; i++)
+      *fb++ = *p++;
+  }
+  A->data_ready = 0;
+  return n;
+}
