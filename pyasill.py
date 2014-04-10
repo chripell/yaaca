@@ -104,6 +104,8 @@ _path = os.path.dirname('__file__')
 _lib = np.ctypeslib.load_library('libasill', _path)
 
 for k,v in _asill_vars.iteritems():
+    if k[:6] == 'ASILL_':
+        k = k[6:]
     _G[k] = v
 
 _cTypes = {
@@ -175,7 +177,7 @@ class Cam(object):
         if as_float:
             dt = np.float32
         else:
-            if _lib.asill_get_format(self.c) == ASILL_FMT_RAW16:
+            if _lib.asill_get_format(self.c) == FMT_RAW16:
                 dt = ">u2"
             else:
                 dt = np.uint8

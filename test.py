@@ -4,10 +4,10 @@ import pyasill as A
 import numpy as np
 import Image
 
-cam = A.Cam(A.ASILL_ASI120MM, 0)
-cam.set_int_par(A.ASILL_PAR_ANALOG_GAIN, 10)
+cam = A.Cam(A.ASI120MC, 0)
+cam.set_int_par(A.PAR_ANALOG_GAIN, 10)
 print cam.get_maxw(), "x", cam.get_maxh()
-#cam.set_wh(cam.get_maxw(), cam.get_maxh(), 1, A.ASILL_FMT_RAW8)
+#cam.set_wh(cam.get_maxw(), cam.get_maxh(), 1, A.FMT_RAW8)
 cam.set_save("/tmp/")
 
 i = 0
