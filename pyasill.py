@@ -100,7 +100,7 @@ _asill_funcs = {'asill_buffer2float': (['int'],
 #########################################################################
 
 _G = globals()
-_path = os.path.dirname('__file__')
+_path = os.path.dirname(os.path.abspath(__file__))
 _lib = np.ctypeslib.load_library('libasill', _path)
 
 for k,v in _asill_vars.iteritems():

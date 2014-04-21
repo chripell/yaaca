@@ -22,4 +22,4 @@ clean:
 	rm *~ *.o yaaca
 
 deb: yaaca
-	./make_deb.sh yaaca "Astrocapture for ZWO ASI cams" "libgtk2.0-0 (>= 2.20.1-2), libusb-1.0-0 (>= 2:1.0.8-2)" yaaca,/usr/bin
+	./make_deb.sh yaaca "Astrocapture for ZWO ASI cams" "libgtk2.0-0 (>= 2.20.1-2), libusb-1.0-0 (>= 2:1.0.8-2)" yaaca,/usr/bin libasill.so,/usr/local/lib pyasill.py,/usr/local/lib
