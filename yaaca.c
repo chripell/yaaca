@@ -47,7 +47,7 @@ static GdkPixbuf *imb;
 static GtkWidget *status2;
 
 static GtkWidget *zoom_im, *cross_pos, *cross_val, *zoom_factor, *m_box;
-static GtkWidget *m_text, *m_save, *m_prof;
+static GtkWidget *m_text, *m_save;
 static FILE  *f_m_save = NULL;
 static GdkPixbuf *zoom_imb;
 static int zoom_imbw = 300, zoom_imbh = 300;
@@ -55,7 +55,13 @@ static int zoom_f;
 
 static GtkWidget *histo_min, *histo_max, *histo_im;
 static GdkPixbuf *histo_imb;
-static int histo_on;
+static GtkWidget *prof_im;
+static int prof_imb_w = 256;
+static int prof_imb_h = 100;
+static GdkPixbuf *prof_imb;
+static unsigned char *prof_data;
+static int histo_on, prof_on;
+static GtkWidget *prof_label;
 
 static int cimg_present = 0;
 static int cimg_w;
@@ -230,6 +236,17 @@ static void histo_cb( GtkWidget *w, gpointer p )
     gtk_widget_hide(histo_im);
 }
 
+static void prof_cb( GtkWidget *w, gpointer p )
+{
+  prof_on = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
+  if (prof_on)
+    gtk_widget_show(prof_im);
+  else {
+    gtk_widget_hide(prof_im);
+    gtk_button_set_label (GTK_BUTTON(prof_label), "prof ");
+  }
+}
+
 static void m_cb( GtkWidget *w, gpointer p )  
 {
   int m_on = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(w));
@@ -391,9 +408,39 @@ static gboolean redraw_fps(gpointer user_data)
   return FALSE;
 }
 
+
+static void prof_set_xy(int x, int y, unsigned int v)
+{
+  if (x >= 0 && x < prof_imb_w && y >= 0 && y < prof_imb_h) {
+    y = prof_imb_h - y - 1;
+    prof_data[3*((x) + (y) * prof_imb_w) + (0)] = (v >> 16) & 0xff;
+    prof_data[3*((x) + (y) * prof_imb_w) + (1)] = (v >>  8) & 0xff;
+    prof_data[3*((x) + (y) * prof_imb_w) + (2)] = (v >>  0) & 0xff;
+  }
+}
+
+static void prof_line(int x0, int y0, int x1, int y1, unsigned int val)
+{
+  int dx = abs(x1-x0), sx = x0<x1 ? 1 : -1;
+  int dy = abs(y1-y0), sy = y0<y1 ? 1 : -1; 
+  int err = (dx>dy ? dx : -dy)/2, e2;
+
+  //printf("(%d,%d)-(%d,%d),", x0, y0, x1, y1); /* DELME */
+ 
+  for(;;){
+    prof_set_xy(x0,y0,val);
+    if (x0==x1 && y0==y1) break;
+    e2 = err;
+    if (e2 >-dx) { err -= dy; x0 += sx; }
+    if (e2 < dy) { err += dx; y0 += sy; }
+  }
+}
+
 static gboolean redraw_image(gpointer user_data)
 {
   int i,j;
+  int range = 20;
+  int frange = 2 * range + 1;
 
   redraw_fps(user_data);
 
@@ -567,9 +614,6 @@ static gboolean redraw_image(gpointer user_data)
       double xm = 0, ym = 0, xd = 0, yd = 0, s = 0;
       int m_m = 0, m_mm = 0;
       int xmi, ymi;
-      unsigned char prof_x[zoom_imbw];
-      unsigned char prof_y[zoom_imbw]; /* assume zoom_imbw == zoom_imbh */
-      int prof_on = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(m_prof));
 
       for(i = -nx/2 ; i < nx/2; i++)
 	for(j = -ny/2 ; j < ny/2; j++) {
@@ -632,7 +676,8 @@ static gboolean redraw_image(gpointer user_data)
 	      m_mm = v;
 	  }
 	}
-      snprintf(m_t, 200, "(%5.1f,%5.1f)(%5.1f,%5.1f)(%3d,%3d)", xm, ym, xd, yd, m_m, m_mm);
+      snprintf(m_t, 200, "cen(%5.1f,%5.1f) std(%5.1f,%5.1f) max(%3d,%3d)", xm, ym, xd, yd, m_m, m_mm);
+      // (x and y of centroid of pixels >= 64) (std deviation x and y) (value on centroid and maximum on a 3x3 area around it)
       gtk_label_set_text(GTK_LABEL(m_text), m_t);
       xmi = (int) xm;
       if (xmi <= 0)
@@ -644,19 +689,6 @@ static gboolean redraw_image(gpointer user_data)
 	ymi = 1;
       if (ymi >= zoom_imbh - 1)
 	ymi = zoom_imbh - 2;
-      if (prof_on) {
-	int xmi = xm;
-	int ymi = ym;
-
-	if (is_cross) {
-	  xmi = zoom_imbw / 2;
-	  ymi = zoom_imbw / 2;
-	}
-	for (i = 0; i < zoom_imbw; i++) {
-	  prof_x[i] = (OXY(i, ymi, 0) + OXY(i, ymi, 1) + OXY(i, ymi, 2)) / 3;
-	  prof_y[i] = (OXY(xmi, i, 0) + OXY(xmi, i, 1) + OXY(xmi, i, 2)) / 3;
-	}
-      }
       for(c = -1; c <= 1; c++) {
 	OXY(xmi+c,ymi,0) = 255;
 	OXY(xmi+c,ymi,1) = 0;
@@ -664,16 +696,6 @@ static gboolean redraw_image(gpointer user_data)
 	OXY(xmi,ymi+c,0) = 255;
 	OXY(xmi,ymi+c,1) = 0;
 	OXY(xmi,ymi+c,2) = 0;
-      }
-      if (prof_on) {
-	for (i = 0; i < zoom_imbw; i++) {
-	  OXY(i, prof_x[i], 0) = 255;
-	  OXY(i, prof_x[i], 1) = 255;
-	  OXY(i, prof_x[i], 2) = 0;
-	  OXY(prof_y[i], i, 0) = 255;
-	  OXY(prof_y[i], i, 1) = 255;
-	  OXY(prof_y[i], i, 2) = 0;
-	}
       }
       gtk_image_set_from_pixbuf(GTK_IMAGE(zoom_im), zoom_imb);
       if (f_m_save) {
@@ -686,6 +708,94 @@ static gboolean redraw_image(gpointer user_data)
 	  last_save = now;
 	}
       }
+    }
+
+    if (prof_on &&
+	cross_x > frange && cross_x < (cimg_w - frange) &&
+	cross_y > frange && cross_y < (cimg_h - frange)) {
+      int mx = cross_x, my = cross_y, m, i, j;
+      double sx = ((double) prof_imb_w - 1) / (frange - 1);
+      double sx2 = sx * 1.4142;
+      double sy = (prof_imb_h - 1) / 255.0;
+      int fx, lx;
+      int fy, ly;
+      double v1, v2, v3, v4;
+      int val0, val1 = 0;
+      char b[50];
+
+      m = -1;
+      for(i = cross_x - range; i <= cross_x + range; i++) 
+	for(j = cross_y - range; j <= cross_y + range; j++) {
+	  int mm = PXY(i, j, 0) + PXY(i, j, 1) + PXY(i, j, 2);
+
+	  if (mm > m) {
+	    m = mm;
+	    mx = i;
+	    my = j;
+	  }
+	}
+
+      memset(prof_data, 0, prof_imb_w * prof_imb_h * 3);
+
+      fx = mx - range;
+      lx = mx + range;
+      v1 = 0.0;
+      for(i = fx; i < lx; i++) {
+	val0 = (PXY(i, my, 0) + PXY(i, my, 1) + PXY(i, my, 2)) / 3;
+	val1 = (PXY(i + 1, my, 0) + PXY(i + 1, my, 1) + PXY(i + 1, my, 2)) / 3;
+	double xx = (i - fx) * sx;
+
+	prof_line(xx, val0 * sy, xx + sx, val1 * sy, 0xffffff);
+	v1 += (i - mx) * (i - mx) * val0;
+      }
+      v1 += (lx - mx) * (lx -mx) * val1;
+      v1 = sqrt(v1 / frange);
+
+      fy = my - range;
+      ly = my + range;
+      v2 = 0.0;
+      for(i = fy; i < ly; i++) {
+	val0 = (PXY(mx, i, 0) + PXY(mx, i, 1) + PXY(mx, i, 2)) / 3;
+	val1 = (PXY(mx, i + 1, 0) + PXY(mx, i + 1, 1) + PXY(mx, i + 1, 2)) / 3;
+	double xx = (i - fy) * sx;
+
+	prof_line(xx, val0 * sy, xx + sx, val1 * sy, 0xffffff);
+	v2 += (i - my) * (i - my) * val0;
+      }
+      v2 += (ly - my) * (ly -my) * val1;
+      v2 = sqrt(v2 / frange);
+
+      v3 = 0.0;
+      for(i = -range; i < range; i++) {
+	int xi = i + mx;
+	int yi = i + my;
+	val0 = (PXY(xi, yi, 0) + PXY(xi, yi, 1) + PXY(xi, yi, 2)) / 3;
+	val1 = (PXY(xi + 1, yi + 1, 0) + PXY(xi + 1, yi + 1, 1) + PXY(xi + 1, yi + 1, 2)) / 3;
+	double xx = i * sx2 + prof_imb_w / 2 - 1;
+
+	prof_line(xx, val0 * sy, xx + sx2, val1 * sy, 0xaaaaaa);
+	v3 += i * i * 2 * val0;
+      }
+      v3 += i * i * 2 * val1;
+      v3 = sqrt(v3 / frange) * 1.19;
+
+      v4 = 0.0;
+      for(i = -range; i < range; i++) {
+	int xi = i + mx;
+	int yi = my - i;
+	val0 = (PXY(xi, yi, 0) + PXY(xi, yi, 1) + PXY(xi, yi, 2)) / 3;
+	val1 = (PXY(xi + 1, yi - 1, 0) + PXY(xi + 1, yi - 1, 1) + PXY(xi + 1, yi - 1, 2)) / 3;
+	double xx = i * sx2 + prof_imb_w / 2 - 1;
+
+	prof_line(xx, val0 * sy, xx + sx2, val1 * sy, 0xaaaaaa);
+	v4 += i * i * 2 * val0;
+      }
+      v4 += i * i * 2 * val1;
+      v4 = sqrt(v4 / frange) * 1.19;
+
+      snprintf(b, 50, "prof:%.1f,%.1f,%.1f,%.1f", v1, v2, v3, v4);
+      gtk_button_set_label (GTK_BUTTON(prof_label), b);
+      gtk_image_set_from_pixbuf(GTK_IMAGE(prof_im), prof_imb);
     }
 
     show_cross(1, 0);
@@ -836,12 +946,14 @@ static GtkWidget *create_entry(char *c, GtkWidget **e, char *def, GCallback cb, 
   return b;
 }
 
-static GtkWidget *create_check(char *c, GCallback cb)
+static GtkWidget *create_check(char *c, GCallback cb, GtkWidget **label)
 {
-  static GtkWidget *e;
+  GtkWidget *e;
 
   e = gtk_check_button_new_with_label (c);
   gtk_widget_show (e);
+  if (label)
+    *label = e;
   if (cb) {
     g_signal_connect (e, "toggled",
 		      G_CALLBACK (cb), NULL);
@@ -851,7 +963,7 @@ static GtkWidget *create_check(char *c, GCallback cb)
 
 static GtkWidget *create_button(char *c, int w, int h, GCallback cb, long priv)
 {
-  static GtkWidget *b;
+  GtkWidget *b;
 
   b = gtk_button_new_with_label (c);
   if (cb) {
@@ -1039,10 +1151,10 @@ int main(int argc, char *argv[])
   gtk_box_pack_start(GTK_BOX (capture_box), create_entry("dir:", &w_capture_path, "/tmp/", NULL, 10, 0), TRUE, TRUE, 0);
   box = gtk_hbox_new (FALSE, 0);
   gtk_widget_show (box);
-  gtk_box_pack_start(GTK_BOX (box), (w_do_capture = create_check("capture", G_CALLBACK (update_do_capture))), TRUE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX (box), (w_capture_raw = create_check("PBM", NULL)), TRUE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX (box), (w_capture_compress = create_check("compress", NULL)), TRUE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX (box), (w_capture_blind = create_check("blind", G_CALLBACK (update_blind))), TRUE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (box), (w_do_capture = create_check("capture", G_CALLBACK (update_do_capture), NULL)), TRUE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (box), (w_capture_raw = create_check("PBM", NULL, NULL)), TRUE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (box), (w_capture_compress = create_check("compress", NULL, NULL)), TRUE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (box), (w_capture_blind = create_check("blind", G_CALLBACK (update_blind), NULL)), TRUE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (capture_box), box, TRUE, TRUE, 0);
 
   pulse_table = gtk_table_new(3, 3, TRUE);
@@ -1058,7 +1170,7 @@ int main(int argc, char *argv[])
   gtk_widget_show(zoom_box);
   cross_box = gtk_hbox_new (FALSE, 0);
   gtk_widget_show(cross_box);
-  gtk_box_pack_start(GTK_BOX (cross_box), create_check("cross", G_CALLBACK (update_cross)), FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (cross_box), create_check("cross", G_CALLBACK (update_cross), NULL), FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (cross_box), (cross_pos = create_label("(0,0)")), FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (cross_box), (cross_val = create_label("=000,0000,000 ")), FALSE, FALSE, 0);
   update_cross_pos();
@@ -1070,8 +1182,7 @@ int main(int argc, char *argv[])
   gtk_box_pack_start(GTK_BOX (zoom_box), zoom_im, FALSE, FALSE, 0);
   m_box = gtk_hbox_new (FALSE, 0);
   gtk_box_pack_start(GTK_BOX (m_box), (m_text = create_label("(0,0)(0,0)(0,0)")), FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX (m_box), (m_save = create_check("save", G_CALLBACK(m_cb))), FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX (m_box), (m_prof = create_check("prof", G_CALLBACK(m_cb))), FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (m_box), (m_save = create_check("save", G_CALLBACK(m_cb), NULL)), FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (zoom_box), m_box, FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (right), zoom_box, FALSE, FALSE, 1);
 
@@ -1079,15 +1190,22 @@ int main(int argc, char *argv[])
   gtk_widget_show(histo1_box);
   histo_box = gtk_hbox_new (FALSE, 0);
   gtk_widget_show(histo_box);
-  gtk_box_pack_start(GTK_BOX (histo_box), create_check("historam ", G_CALLBACK(histo_cb)), FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX (histo_box), create_entry("min:", &histo_min, "0", NULL, 3, 3), FALSE, FALSE, 0);
-  gtk_box_pack_start(GTK_BOX (histo_box), create_entry("max:", &histo_max, "255", NULL, 3, 3), FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (histo_box), create_check("hist:", G_CALLBACK(histo_cb), NULL), FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (histo_box), create_entry("", &histo_min, "0", NULL, 3, 3), FALSE, FALSE, 0);
+  gtk_box_pack_start(GTK_BOX (histo_box), create_entry("-", &histo_max, "255", NULL, 3, 3), FALSE, FALSE, 0);
   gtk_box_pack_start(GTK_BOX (histo1_box), histo_box, FALSE, FALSE, 0);  
   histo_im = gtk_image_new();
   histo_imb = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, 256, 100);
   gtk_image_set_from_pixbuf(GTK_IMAGE(histo_im), histo_imb);
   gtk_box_pack_start(GTK_BOX (histo1_box), histo_im, FALSE, FALSE, 0);  
   gtk_box_pack_start(GTK_BOX (right), histo1_box, FALSE, FALSE, 1);  
+
+  gtk_box_pack_start(GTK_BOX (histo_box), create_check("prof ", G_CALLBACK(prof_cb), &prof_label), FALSE, FALSE, 0);
+  prof_im = gtk_image_new();
+  prof_imb = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, prof_imb_w, prof_imb_h);
+  gtk_image_set_from_pixbuf(GTK_IMAGE(prof_im), prof_imb);
+  prof_data = gdk_pixbuf_get_pixels(prof_imb);
+  gtk_box_pack_start(GTK_BOX (histo1_box), prof_im, FALSE, FALSE, 0);
 
   gtk_widget_show (window);
   ccam->run(cam, 1);
@@ -1102,6 +1220,22 @@ int main(int argc, char *argv[])
 static int diff_us(struct timeval from, struct timeval to)
 {
   return 1000000 * (to.tv_sec - from.tv_sec) + (to.tv_usec - from.tv_usec);
+}
+
+void gauss(unsigned char *d, int xt, int xc, int yc, double sigma)
+{
+  int x, y;
+  double sigma2 = - 1.0 / (2 * sigma * sigma);
+
+  for(x = xc - 50; x <= xc + 50; x++)
+    for(y = yc - 50; y <= yc + 50; y++) {
+      double val = exp( sigma2 * ( (x - xc) * (x - xc) + (y -yc) * (y - yc) ));
+      int o = 255 * val /* + d[xt * y + x] */;
+
+      if (o > 255)
+	o = 255;
+      d[xt * y + x] = o;
+    }
 }
 
 int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
@@ -1133,6 +1267,18 @@ int yaac_new_image(unsigned char *data, int w, int h, int format, int bpp)
     cimg_h = h;
     cimg_format = format;
     cimg_bpp = bpp;
+#if 0
+    if (bpp == 1) {
+      gauss(cimg, w, 100, 100, 2);
+      gauss(cimg, w, 200, 200, 1);
+      gauss(cimg, w, 300, 300, 0.5);
+      gauss(cimg, w, 400, 400, 0.1);
+      gauss(cimg, w, 500, 500, 3);
+      gauss(cimg, w, 600, 600, 5);
+      gauss(cimg, w, 700, 700, 7);
+      gauss(cimg, w, 800, 800, 10);
+    }
+#endif
     cimg_present = 1;
     g_timeout_add(1, redraw_image, NULL);
   }
