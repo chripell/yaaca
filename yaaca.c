@@ -259,7 +259,7 @@ static void m_cb( GtkWidget *w, gpointer p )
   }
 }
 
-static void setup_im(nimg_w, nimg_h)
+static void setup_im(int nimg_w, int nimg_h)
 {
   if (nimg_w != imbw || nimg_h != imbh) {
     GdkPixbuf *oimb;
@@ -1007,7 +1007,6 @@ int main(int argc, char *argv[])
   GtkWidget *histo_box, *histo1_box;
   int n_cam;
 
-  g_thread_init (NULL);
   gtk_init (&argc, &argv);
 
   n_cam = getenv("YAACA_CAM") ? atoi(getenv("YAACA_CAM")) : 0;

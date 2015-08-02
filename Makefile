@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=$(shell pkg-config --cflags gtk+-2.0 libusb-1.0) -I. -g -O2 -Wall -D_LIN -pthread
-LDFLAGS=SDK/libASICamera.a $(shell pkg-config --libs gtk+-2.0 libusb-1.0) -lstdc++ -lm -g -pthread
+LDFLAGS=SDK/libASICamera.a $(shell pkg-config --libs gtk+-2.0 libusb-1.0 libpng) -lstdc++ -lm -g -pthread
 
 all: yaaca libasill.so
 

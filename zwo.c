@@ -317,7 +317,7 @@ struct zwo_cam {
   ZWP(bandwidthoverload);
   volatile int run;
   GThread *worker;
-  GStaticMutex lock;
+  GMutex lock;
   int maxw;
   int maxh;
 };
@@ -354,7 +354,7 @@ static gpointer zwo_worker(gpointer z_)
   bs = z->maxw * z->maxh * 3;
   buf = malloc(bs);
   while (1) {
-    g_static_mutex_lock(&z->lock);
+    g_mutex_lock(&z->lock);
     if (old_run == 0 && z->run == 1) {
       zwo_setup(z);
       startCapture();
@@ -386,7 +386,7 @@ static gpointer zwo_worker(gpointer z_)
     PTAC(brightness, 5);
     PTAC(bandwidthoverload, 6);
 
-    g_static_mutex_unlock(&z->lock);
+    g_mutex_unlock(&z->lock);
     if (old_run) {
       if (getImageData(buf, resolutions_x[z->resolution] * resolutions_y[z->resolution] * format_dim[z->format] , 1000)) {
 	yaac_new_image(buf, resolutions_x[z->resolution], resolutions_y[z->resolution], z->format, format_dim[z->format]);
@@ -413,6 +413,7 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   int av;
   int numDevices;
   struct utsname uts;
+  char *model;
 
   numDevices = getNumberOfConnectedCameras();
   if(numDevices <= 0) {
@@ -443,34 +444,32 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
 
   *maxw = getMaxWidth();
   *maxh = getMaxHeight();
-  fprintf(stderr, "DELME %d %d %d\n", *maxw, *maxh, getCameraType(n));
-
-  switch(getCameraType(n)) {
-  case CAMERA_ASI034MC:
+  model =getCameraModel(n);
+  fprintf(stderr, "DELME %d %d %s\n", *maxw, *maxh, model);
+  
+  if (!strcmp(model, "ASI034MC")) {
     resolutions = all_resolutions_asi034;
     resolutions_x = all_resolutions_x_asi034;
     resolutions_y = all_resolutions_y_asi034;
     resolutions_bin = all_resolutions_bin_asi034;
-    break;
-  case CAMERA_ASI130MM:
+  }
+  else if (!strcmp(model, "ASI130MM")) {
     resolutions = all_resolutions_asi130;
     resolutions_x = all_resolutions_x_asi130;
     resolutions_y = all_resolutions_y_asi130;
     resolutions_bin = all_resolutions_bin_asi130;
-    break;
-  case CAMERA_ASI035MM:
-  case CAMERA_ASI035MC:
+  }
+  else if (!strcmp(model, "ASI035MM") || !strcmp(model, "ASI035MC")) {
     resolutions = all_resolutions_asi035;
     resolutions_x = all_resolutions_x_asi035;
     resolutions_y = all_resolutions_y_asi035;
     resolutions_bin = all_resolutions_bin_asi035;
-    break;
-  default:
+  }
+  else {
     resolutions = all_resolutions_asi120;
     resolutions_x = all_resolutions_x_asi120;
     resolutions_y = all_resolutions_y_asi120;
     resolutions_bin = all_resolutions_bin_asi120;
-    break;
   }
 
   while (*resolutions_x > *maxw || *resolutions_y > *maxh) {
@@ -539,11 +538,11 @@ static void *zwo_cam_init(int n, struct yaaca_ctrl **ctrls, int *n_ctrls, int *m
   z->pixel_size = getPixelSize();
   z->bayern = getColorBayer();
   fprintf(stderr, "bayer is %d\n", z->bayern);
-  z->model = getCameraModel(n);
+  z->model = model;
   z->color = isColorCam();
   z->format = 1;
-  g_static_mutex_init(&z->lock);
-  z->worker = g_thread_create(zwo_worker, z, FALSE, NULL);
+  g_mutex_init(&z->lock);
+  z->worker = g_thread_new("zwo_worker", zwo_worker, z);
   return z;
 }
 
@@ -554,11 +553,11 @@ static int zwo_set(void * cam, int ctrl, double val, int autov)
 
 #define ZWO_SET(I, V) do {			\
     if (ctrl == I) {				\
-      g_static_mutex_lock(&z->lock);		\
+      g_mutex_lock(&z->lock);		\
       z->V = val;				\
       z->V ## _auto = autov; 			\
       z->V ## _changed = 1;			\
-      g_static_mutex_unlock(&z->lock);		\
+      g_mutex_unlock(&z->lock);		\
       return 0;					\
     }						\
   } while(0)
