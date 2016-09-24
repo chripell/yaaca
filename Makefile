@@ -1,25 +1,16 @@
-CC=gcc
-CFLAGS=$(shell pkg-config --cflags gtk+-2.0 libusb-1.0) -I. -g -O2 -Wall -D_LIN -pthread
-LDFLAGS=SDK/libASICamera.a $(shell pkg-config --libs gtk+-2.0 libusb-1.0 libpng) -lstdc++ -lm -g -pthread
 
-all: yaaca libasill.so
+ARCH := $(shell getconf LONG_BIT)
 
-yaaca: zwo.o yaaca.o zwoll.o asill.o
-	gcc $(CFLAGS) -o $@ $^ $(LDFLAGS)
+ASILIB_64=lib/x64/libASICamera2.a
+ASILIB_32=lib/x86/libASICamera2.a
 
-libasill.so: asill.c
-	gcc $(CFLAGS) -fPIC -shared -o $@ asill.c $(shell pkg-config --libs libusb-1.0)
-
-zwo.o: zwo.c yaaca.h
-
-zwoll.o: zwoll.c yaaca.h asill.h
-
-asill.o : asill.c asill.h
-
-yaaca.o: yaaca.c yaaca.h
+libyaaca.so.1: yaaca_server.c yaaca_server.h
+	gcc -pthread -D_GNU_SOURCE -std=c99 -Iinclude -I jsmn -fPIC -g -c -Wall \
+		yaaca_server.c jsmn/jsmn.c
+	g++ -pthread -shared -Wl,-soname,libyaaca.so.1 -o libyaaca.so.1.0.1 \
+		yaaca_server.o jsmn.o ${ASILIB_${ARCH}} -lusb -lc
+	ln -sf libyaaca.so.1.0.1 libyaaca.so.1
 
 clean:
-	rm *~ *.o yaaca
+	rm -f *~ *.so.* *.o *.pyc
 
-deb: yaaca
-	./make_deb.sh yaaca "Astrocapture for ZWO ASI cams" "libgtk2.0-0 (>= 2.20.1-2), libusb-1.0-0 (>= 2:1.0.8-2)" yaaca,/usr/bin libasill.so,/usr/local/lib pyasill.py,/usr/local/lib
