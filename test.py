@@ -1,25 +1,46 @@
-#!/usr/bin/env python
+#!/usr/bin/python2
 
-import pyasill as A
-import numpy as np
-import Image
+import ASI
+import time
+import scipy.misc
 
-cam = A.Cam(A.ASI120MC, 0)
-cam.set_int_par(A.PAR_ANALOG_GAIN, 10)
-print cam.get_maxw(), "x", cam.get_maxh()
-#cam.set_wh(cam.get_maxw(), cam.get_maxh(), 1, A.FMT_RAW8)
-cam.set_save("/tmp/")
+print(ASI.list())
 
-i = 0
-while True:
-    x = cam.get_frame()
-    #x = cam.get_frame(True)
-    if x != None:
-        if i < 5:
-            i = i + 1
-            continue
-        print x.shape, " ",x.dtype, " ", x.min(), "-", x.max()
-        x = x * 255.0 / x.max()
-        IM = Image.fromarray(x.astype(np.uint8))
-        IM.save("test.png");
-        break
+c = ASI.Camera(0)
+print(c.prop())
+c.set({'width': 640, 'height': 480, 'start_x': 320, 'start_y': 240})
+s = c.stat()
+assert s['width'] == 640
+assert s['height'] == 480
+assert s['start_x'] == 320
+assert s['start_y'] == 240
+# Only for color ones 1:
+c.set({'type': 1})
+c.start()
+print(c.stat())
+for i in xrange(5):
+    time.sleep(0.5)
+    s = c.stat()
+    im = c.get_image()
+    print s['captured'], s['vals'][7]/10.0, s['width'], s['height'], s['type'], im.shape
+    c.set({'start_x': 320 - 20 * (i + 1)})
+    scipy.misc.imsave('/tmp/yaaca_test_%d.jpg' % i, im)
+s = c.stat()
+v = s['vals']
+a = s['auto']
+v[0] = 33
+a[0] = False
+v[1] = 111111
+a[1] = False
+c.set({'vals': v, 'auto': a, 'start_x': 0, 'start_y': 0})
+time.sleep(1)
+s = c.stat()
+print(s)
+assert s['start_x'] == 0
+assert s['start_y'] == 0
+assert s['vals'][0] == 33
+assert not s['auto'][0]
+assert s['vals'][1] == 111111
+assert not s['auto'][1]
+c.stop()
+c.close()
