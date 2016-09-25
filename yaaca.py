@@ -499,7 +499,7 @@ class ImageManager(object):
             self.box_size = 1
         if self.box_size > 256:
             self.box_size = 256
-        self.update_info()
+        self.norm_cross()
         self.main.queue_draw()
 
 
@@ -971,7 +971,8 @@ class MenuManager(Gtk.MenuBar):
                         "Start", lambda _: self._camera.start())
         self._add_entry(_camera_menu,
                         "Stop", lambda _: self._camera.stop())
-        self._add_check(_camera_menu, "Record", lambda w: self._toggle_int(w, "recording"))
+        self._rec_toggle = self._add_check(
+            _camera_menu, "Record", lambda w: self._toggle_int(w, "recording"))
         self._add_check(_camera_menu, "Long Exposure mode", lambda w: self._toggle_int(w, "mode"))
         self._add_entry(_camera_menu,
                         "Settings", self._show_settings)
@@ -1005,6 +1006,9 @@ class MenuManager(Gtk.MenuBar):
         self._add_entry(_view_menu, "Reset", self._reset_all)
 
         self.show_all
+
+    def _do_toggle(self, w):
+        w.set_active(not w.get_active())
 
     def _reset_all(self, w):
         self._do_saa.set_active(False)
@@ -1119,6 +1123,8 @@ class Mainwindow(Gtk.Window):
             self.imman.mul_box_size(False)
         elif ev.string == 'n':
             self.imman.mul_box_size(True)
+        elif ev.string == 'r':
+            self.menu._do_toggle(self.menu._rec_toggle)
         elif ev.keyval in self._arrows:
             self.camera.camera.pulse(self._arrows[ev.keyval], True)
 
