@@ -947,6 +947,7 @@ class MenuManager(Gtk.MenuBar):
         self._current = None
         self._im = im
         self._groups = {}
+        self._groups2 = {}
         self._settings = None
         self._roi = None
         Gtk.MenuBar.__init__(self)
@@ -1059,12 +1060,17 @@ class MenuManager(Gtk.MenuBar):
     def _add_radio(self, menu, group, name, command, active):
         item = Gtk.RadioMenuItem(None, label = name)
         if self._groups.get(group, None):
-            item.join_group(self._groups[group])
+            # Workaround for incompatile GTK3 interfaces:
+            try:
+                item.join_group(self._groups[group])
+            except:
+                item.set_group(self._groups2[group])
         item.set_active(active)
         item.connect("activate", command)
         menu.append(item)
         if not self._groups.get(group, None):
             self._groups[group] = item
+            self._groups2[group] = item.get_group()
         
     def _add_separator(self, menu):
         menu.append(Gtk.SeparatorMenuItem())
