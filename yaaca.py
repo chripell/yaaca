@@ -230,22 +230,22 @@ class ImageManager(object):
         self.norm_cross()
         if imtype == 1 or (imtype == 0 and auto_debayer != 0):
             l.write('P6\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
-            l.write(im.tobytes())
+            l.write(im.tostring())
             done = True
         elif imtype == 2 and auto_debayer != 0:
             l.write('P6\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
             # I have no idea why R and B are swapped :-/
-            l.write(im.view('B')[:,:,5::-2].tobytes())
-            l.write(im.tobytes())
+            l.write(im.view('B')[:,:,5::-2].tostring())
+            l.write(im.tostring())
             done = True
         elif imtype == 2 :
             l.write('P5\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
-            l.write(im.view('B')[:,1::2].tobytes())
-            l.write(im.tobytes())
+            l.write(im.view('B')[:,1::2].tostring())
+            l.write(im.tostring())
             done = True
         else:
             l.write('P5\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
-            l.write(im.tobytes())
+            l.write(im.tostring())
             done = True
         if not done:
             raise ValueError('Unsupported image format %s in numpy array' % im.dtype)
