@@ -327,7 +327,6 @@ static void * zwo_capture(void *z_) {
     im = z->buf[z->head];
     if (mode & MODE_LONG) {
       r = ASIGetExpStatus(id, &s.mode_status);
-      fprintf(stderr, "DELMEA %d %d\n", r, s.mode_status);
       if (r == ASI_SUCCESS) {
 	switch (s.mode_status) {
 	case ASI_EXP_IDLE:
@@ -367,16 +366,6 @@ static void * zwo_capture(void *z_) {
     case -1:
       break;
     case ASI_SUCCESS:
-#if 0
-      {
-	struct timeval tv;
-	struct timeval old_tv;
-	gettimeofday(&tv, NULL);
-	fprintf(stderr, "DELME: %ld.%06ld %ld\n", tv.tv_sec, tv.tv_usec,
-		(tv.tv_sec - old_tv.tv_sec) * 1000 + (tv.tv_usec - old_tv.tv_usec) / 1000);
-	old_tv = tv;
-      }
-#endif
       pthread_mutex_lock(&z->lock_buf);
       z->buf_width[z->head] = z->current_capture.width;
       z->buf_height[z->head] = z->current_capture.height;
@@ -1235,7 +1224,6 @@ int yaaca_cmd(const char *req, char *resp, int len) {
     else {
       ret = ASIPulseGuideOff(idx, dir);
     }
-    fprintf(stderr, "DELME pulse %d %d %d\n", ret, on, dir);
     if (ret != ASI_SUCCESS)
       ret -= 1000;
     return ret;
