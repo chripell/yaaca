@@ -5,10 +5,16 @@ yaaca is an application, written in Python and C, for acquisition of
 images/videos with the ZWO ASI series of astronomical webcam.
 
 It depends on Numeric Python and GTK3 gi interface available for
-Python2. The packages needed on arch Linux are:
+Python2. The packages needed on Arch Linux are:
 
 ```shell
-pacman -S python2-numpy python2-gobject gtk3 gcc make libusb
+pacman -S python2-numpy python2-gobject gtk3 gcc make libusb-1.0 python2-cairo
+```
+
+instead on Ubuntu with python2 as defult:
+
+```shell
+apt-get install gir1.2-gtk-3.0 gcc make libusb-1.0 python-numpy python-gobject python-gi python-gi-cairo
 ```
 
 It is build around a C interface to the ZWO provided library. You can
@@ -25,6 +31,7 @@ repository and compile the C part and launch it:
 git clone https://github.com/chripell/yaaca
 cd yaaca
 make
+export LD_LIBRARY_PATH=.
 ./yaaca.py
 ```
 
