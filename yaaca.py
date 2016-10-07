@@ -413,7 +413,7 @@ class ImageManager(object):
     def norm_cross(self):
         if self.px < 0 or self.px >= self.im_width:
             self.px = self.im_width / 2
-        if self.py < 0 or self.py >= self.im_width:
+        if self.py < 0 or self.py >= self.im_height:
             self.py = self.im_height / 2
         self.update_info()
         
@@ -814,6 +814,31 @@ class ROIDialog(Gtk.Dialog, DialogMixin):
         box.add(self._grid)
         self.connect("response", self.on_response)
         self.connect('delete-event', self.on_destroy)
+
+        button_grid = Gtk.Grid()
+        button_grid.set_row_homogeneous(True)
+        button_grid.set_column_homogeneous(True)
+        self._grid.attach(button_grid, 0, 7, 2, 2)
+        for i in xrange(8):
+            bi = (i // 4) + 1
+            pa = 4 - (i % 4)
+            bwidth = self._par["MaxWidth"] / bi
+            width = bwidth * pa / 4
+            x = (bwidth - width) / 2
+            bheight = self._par["MaxHeight"] / bi
+            height = bheight * pa / 4
+            y = (bheight - height) / 2
+            b = Gtk.Button.new_with_mnemonic("_%d:%dx%dx%d" % (i + 1, width, height, bi))
+            s = {
+                "bin": bi,
+                "start_x": x,
+                "start_y": y,
+                "width": width,
+                "height": height,
+                }
+            b.connect("clicked", lambda w, s=s: self._change_values(s))
+            button_grid.attach(b, i % 4, i // 4, 1, 1)
+
         self.show_all()
         
     def update(self):
