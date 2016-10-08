@@ -741,9 +741,16 @@ class Choicer(object):
 
 
 class DialogMixin(object):
+
+    def _assure_mul(self, w, par, mul):
+        if par in w:
+            w[par] = w[par] // mul * mul
+
     def _change_values(self, w=None):
         if w is None:
             w = self._default_change()
+        self._assure_mul(w, "width", 8)
+        self._assure_mul(w, "height", 2)
         self.camera_.stop()
         try:
             r = self.camera_.set(w)
