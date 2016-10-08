@@ -466,7 +466,7 @@ static void * zwo_save(void *z_) {
   int csaving = 0;
   int cerror = 0;
   char cdest[FILENAME_MAX];
-  FILE *f;
+  FILE *f = NULL;
   int64_t offset_gmt;
   int64_t epochTicks = 621355968000000000LL;
   int64_t ticksPerSecond = 10000000;
@@ -474,7 +474,7 @@ static void * zwo_save(void *z_) {
   struct tm *tmp;
   time_t now = time(NULL);
   struct SERHeader_s hdr;
-  int start_temp;
+  int start_temp = 0;
   time_t start_t;
   struct timeval tv;
   
@@ -701,8 +701,13 @@ static void * zwo_save(void *z_) {
 	  }
 	}
 	if (csaving == 1 && nsaving == 1) {
-	  if (fwrite(z->ubuf, zwo_imlen(z), 1, f) != 1) {
-	    fprintf(stderr, "Error saving: %s\n", strerror(errno));
+	  if (!f || fwrite(z->ubuf, zwo_imlen(z), 1, f) != 1) {
+	    if (!f) {
+	      fprintf(stderr, "Error saving, inconsistency\n");
+	    }
+	    else {
+	      fprintf(stderr, "Error saving: %s\n", strerror(errno));
+	    }
 	    cerror = errno;
 	    csaving = 0;
 	  }
@@ -1212,8 +1217,8 @@ int yaaca_cmd(const char *req, char *resp, int len) {
   else if(!strcmp(buf, "pulse")) {
     int idx = get_idx();
     int ret = 0;
-    ASI_GUIDE_DIRECTION dir;
-    int on;
+    ASI_GUIDE_DIRECTION dir = 0;
+    int on = 0;
     
     if (idx < 0) return idx;
     GET_INT(dir, dir);
