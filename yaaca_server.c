@@ -663,7 +663,7 @@ static void * zwo_save(void *z_) {
 	    start_temp = z->ubuf_temp;
 	    time(&start_t);
 	    memset(&hdr, 0, sizeof(hdr));
-	    strcpy(hdr.FileID, "LUCAM-RECORDER");
+	    memcpy(hdr.FileID, "LUCAM-RECORDER", sizeof(hdr.FileID));
 	    hdr.LittleEndian = 0;
 	    switch (type) {
 	    case ASI_IMG_RAW8:
