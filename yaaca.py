@@ -56,7 +56,7 @@ class ImageManager(object):
         self.px = -1
         self.py = -1
         self.cross = False
-        self.hist = True
+        self.hist = False
         self.histo_data = None
         self.bins = [2*i - 0.5 for i in range(129)]
         self.stretch_from = 0
@@ -73,7 +73,8 @@ class ImageManager(object):
         self.disp_im = None
 
     def update_info(self):
-        s = "<b>%d</b>,<b>%d</b> box(b,n) <b>%d</b>" % (self.px, self.py, self.box_size)
+        s = "<b>%d</b>,<b>%d</b> box(b,n) <b>%d</b>\nstretch: <b>%d-%d</b>" % (
+            self.px, self.py, self.box_size, self.stretch_from, self.stretch_to)
         if not self.disp_im is None:
             if len(self.disp_im.shape) == 3:
                 s = s + "\nV: %d, %d, %d" % (int(self.disp_im[self.py,self.px,0]),
@@ -130,7 +131,8 @@ class ImageManager(object):
         self.do_saa = False
         
     def process_image(self):
-        if not (self.hist or self.do_dark or  self.do_saa or self.add_dark):
+        if not (self.hist or self.do_dark or  self.do_saa or self.add_dark or
+                    self.stretch_from > 0 or self.stretch_to < 255):
             return self.im, self.imtype, self.auto_debayer
         
         done = False
@@ -156,7 +158,8 @@ class ImageManager(object):
         if not done:
             raise ValueError('Unsupported image format %s in numpy array' % im.dtype)
 
-        self.histo_data = np.histogram(imL, bins=self.bins)[0]
+        if self.hist:
+            self.histo_data = np.histogram(imL, bins=self.bins)[0]
         
         if (self.stretch_from > 0 or self.stretch_to < 255 or
                 self.do_saa or self.do_dark or self.add_dark):
@@ -264,7 +267,7 @@ class ImageManager(object):
             
         self.main.queue_draw()
         self.small.queue_draw()
-        if self.hist:
+        if self.hist or self.stretch_from > 0 or self.stretch_to < 255:
             self.histo.queue_draw()
 
     def calc(self):
@@ -455,14 +458,14 @@ class ImageManager(object):
         cr.line_to(0, height)
         cr.line_to(0, 0)
         cr.stroke()
-        if self.hist and self.histo_data is not None:
-            if self.stretch_from >= 0:
-                cr.set_source_rgb(0.9, 0.6, 0.6)
-                cr.rectangle(self.stretch_from, 0, self.stretch_to - self.stretch_from, height)
-                cr.fill()
+        if self.stretch_from >= 0:
+            cr.set_source_rgb(0.9, 0.6, 0.6)
+            cr.rectangle(self.stretch_from, 0, self.stretch_to - self.stretch_from, height)
+            cr.fill()
+        cr.set_source_rgb(0.1, 0.1, 0.1)
+        if self.histo_data is not None:
             xscale = width / 127.0
             yscale = float(height) / np.max(self.histo_data)
-            cr.set_source_rgb(0.1, 0.1, 0.1)
             cr.new_path()
             cr.move_to(0, height - 0)
             cr.line_to(0, height - self.histo_data[0] * yscale)
@@ -472,7 +475,7 @@ class ImageManager(object):
             cr.close_path()
             cr.fill()
         else:
-            self.centered_text(w, cr, 10, "Open a Camera!")
+            self.centered_text(w, cr, 10, "No histogram data.")
 
     def add_stretch_from(self, diff):
         self.stretch_from += diff
@@ -1027,7 +1030,7 @@ class MenuManager(Gtk.MenuBar):
         self._add_radio(_view_menu, 'debayer', "Fast debayer", lambda w: self._set_int("auto_debayer", 2), False)
         self._add_separator(_view_menu)
         self._add_check(_view_menu, "Cross", lambda w: self._im.set_cross(w.get_active()))
-        self._add_check(_view_menu, "Histogram", lambda w: self._im.set_histo(w.get_active()), on=True)
+        self._add_check(_view_menu, "Histogram", lambda w: self._im.set_histo(w.get_active()))
         self._add_separator(_view_menu)
         self._do_saa = self._add_check(_view_menu, "SAA", lambda w: self._im.set_saa(w.get_active()))
         self._add_dark = self._add_check(_view_menu, "Sub Dark", lambda w: self._im.sub_dark(
