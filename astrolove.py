@@ -864,14 +864,19 @@ class SerReader:
             return demosaic(r, 2, 0)
         elif self.color_id == 101:
             if self.depth == 8:
-                buffer = self.fd.read(3 * self.width * self.height)
-                arr = np.frombuffer(buffer,
-                            dtype='u1',
-                            count=int(self.width)*int(self.height)*3,
-                            offset=0
-                            ).reshape((self.height, self.width, 3))
-                r = [arr[:,:,2], arr[:,:,1], arr[:,:,0]]
-                return [x.transpose() for x in r]
+                b = 1
+                dt = 'u1'
+            else:
+                b = 2
+                dt = '<u2'
+            buffer = self.fd.read(b * 3 * self.width * self.height)
+            arr = np.frombuffer(buffer,
+                                dtype=dt,
+                                count=int(self.width)*int(self.height)*3,
+                                offset=0
+                                ).reshape((self.height, self.width, 3))
+            r = [arr[:,:,2], arr[:,:,1], arr[:,:,0]]
+            return [x.transpose() for x in r]
         raise ValueError("Unsupported color_is %d depth %d" % self.color_id, self.depth)
 
 
