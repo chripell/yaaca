@@ -701,7 +701,7 @@ static void * zwo_save(void *z_) {
 	  }
 	}
 	if (csaving == 1 && nsaving == 1) {
-	  if (!f || fwrite(z->ubuf, zwo_imlen(z), 1, f) != 1) {
+	  if (!f || fwrite(im, zwo_imlen(z), 1, f) != 1) {
 	    if (!f) {
 	      fprintf(stderr, "Error saving, inconsistency\n");
 	    }
