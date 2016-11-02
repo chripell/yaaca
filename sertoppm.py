@@ -11,13 +11,12 @@ from optparse import OptionParser
 
 parser = OptionParser(usage = "usage: %prog [opts] " + AL.expand_file_list_help)
 
-is_raw = False
 parser.add_option("--out", type = "string", default = "image%d",
                       help = "output file template, default image%d")
 parser.add_option("--raw", action="store_true", dest="is_raw")
 (options, args) = parser.parse_args()
 
-ser = AL.SerReader(args[0], is_raw)
+ser = AL.SerReader(args[0], options.is_raw)
 
 for i in xrange(ser.count):
     im = ser.get()
