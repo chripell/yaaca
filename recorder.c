@@ -27,14 +27,14 @@ static void set_cap(int idx, int val) {
 }
 
 int main(int argc, char *argv[]) {
-  unsigned int exposure, gain, mode, nzwo, bin;
+  unsigned int exposure, gain, mode, nzwo, bin, lm;
   ASI_CAMERA_INFO prop;
   unsigned char *buff;
   int bsize, n=0, max = 0;
   float sum = 0.0;
   
-  if (argc != 6) {
-    printf("Usage: %s [camera idx] [mode] [bin] [exposure in ms] [gain]\n", argv[0]);
+  if (argc != 7) {
+    printf("Usage: %s [camera idx] [mode] [bin] [exposure in ms] [gain] [long mode]\n", argv[0]);
     exit(1);
   }
   cidx = strtoul(argv[1], NULL, 0);
@@ -42,6 +42,7 @@ int main(int argc, char *argv[]) {
   bin = strtoul(argv[3], NULL, 0);
   exposure = strtoul(argv[4], NULL, 0);
   gain = strtoul(argv[5], NULL, 0);
+  lm = strtoul(argv[6], NULL, 0);
   nzwo = ASIGetNumOfConnectedCameras();
   if (cidx >= nzwo) {
     fprintf(stderr, "Camera out of range %d/%d\n", cidx, nzwo);
@@ -54,22 +55,62 @@ int main(int argc, char *argv[]) {
   CHECK(ASISetROIFormat(cidx, prop.MaxWidth/bin, prop.MaxHeight/bin, bin, mode));
   set_cap(ASI_EXPOSURE, exposure * 1000);
   set_cap(ASI_GAIN, gain);
-  CHECK(ASIStartVideoCapture(cidx));
+  if (!lm)
+    CHECK(ASIStartVideoCapture(cidx));
   while (1) {
     int r;
     struct timespec start, stop;
     long delta;
 
     clock_gettime(CLOCK_MONOTONIC, &start);
-    r = ASIGetVideoData(cidx, buff, bsize, 2 * exposure + 500);
+    if (lm) {
+      ASI_EXPOSURE_STATUS s;
+	
+      CHECK(ASIGetExpStatus(cidx, &s));
+      if (s != ASI_EXP_IDLE) {
+	fprintf(stderr, "Not idle\n");
+	exit(1);
+      }
+      CHECK(ASIStartExposure(cidx, 0));
+      fprintf(stderr, "\rS");
+      r = 99;			/* timeout */
+      do {
+	usleep(10*1000);
+	clock_gettime(CLOCK_MONOTONIC, &stop);
+	delta = (stop.tv_sec - start.tv_sec) * 1000 +
+	  (stop.tv_nsec - start.tv_nsec) / 1000000;
+	CHECK(ASIGetExpStatus(cidx, &s));
+	if (s == ASI_EXP_IDLE) {
+	  fprintf(stderr, "Unexpected idle\n");
+	  exit(1);
+	}
+	else if (s == ASI_EXP_SUCCESS) {
+	  r = 0;
+	  fprintf(stderr, "F");
+	  CHECK(ASIGetDataAfterExp(cidx, buff, bsize));
+	  break;
+	} else if (s == ASI_EXP_FAILED) {
+	  r = 98;
+	  break;
+	}
+	else if (s != ASI_EXP_WORKING) {
+	  fprintf(stderr, "Unexpected status\n");
+	  exit(1);
+	}
+      } while (delta < 2 * exposure + 500);
+    }
+    else {
+      r = ASIGetVideoData(cidx, buff, bsize, 2 * exposure + 500);
+      clock_gettime(CLOCK_MONOTONIC, &stop);
+      delta = (stop.tv_sec - start.tv_sec) * 1000 +
+	(stop.tv_nsec - start.tv_nsec) / 1000000;
+      fprintf(stderr, "\r");
+    }
     n++;
-    clock_gettime(CLOCK_MONOTONIC, &stop);
-    delta = (stop.tv_sec - start.tv_sec) * 1000 +
-      (stop.tv_nsec - start.tv_nsec) / 1000000;
     if (delta > max)
       max = delta;
     sum += delta;
-    fprintf(stderr, "\r%2d %6.0f(%6d) %ld                            ",
+    fprintf(stderr, "%2d %6.0f(%6d) %ld                            ",
 	    r, sum / n, max, delta);
   }
   return 0;
