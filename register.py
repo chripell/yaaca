@@ -22,8 +22,8 @@ parser.add_option("--crop-x", type = "int", default = 0, help = "crop x")
 parser.add_option("--crop-y", type = "int", default = 0, help = "crop y")
 parser.add_option("--crop-w", type = "int", default = -1, help = "crop w")
 parser.add_option("--crop-h", type = "int", default = -1, help = "crop h")
-parser.add_option("--roi-x", type = "int", default = 0, help = "roi x")
-parser.add_option("--roi-y", type = "int", default = 0, help = "roi y")
+parser.add_option("--roi-x", type = "int", default = -1, help = "roi x")
+parser.add_option("--roi-y", type = "int", default = -1, help = "roi y")
 parser.add_option("--roi-w", type = "int", default = -1, help = "roi w")
 parser.add_option("--roi-h", type = "int", default = -1, help = "roi h")
 parser.add_option("--out-dir", type = "string", default = ".", help = "output dir, default to current")
@@ -82,6 +82,10 @@ for n in AL.expand_args(args) :
         roi_w = crop_w
     if roi_h == -1 :
         roi_h = crop_h
+    if roi_x == -1 :
+        roi_x = (imRGB[0].shape[0] - roi_w) / 2
+    if roi_y == -1 :
+        roi_y = (imRGB[0].shape[1] - roi_h) / 2
     imRGB = [x.astype(AL.myfloat) for x in imRGB]
     if dark != "N" :
         imRGB = [x - y for x,y in zip(imRGB, darkf)]
@@ -126,7 +130,7 @@ for n in AL.expand_args(args) :
     if method == 1 :
         nim = AL.canny(nim, sigma = 3)
     if method == 0 or method == 1 :
-        if ref == None :
+        if ref is None :
             imout = imRGB
             ref = np.fft.fft2(nim)
             print "0 0"

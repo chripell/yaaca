@@ -617,7 +617,7 @@ def save_stack(stack, width, height, dataMode, im_mode, fname, imw):
         stack = [fromwav(x, y[1], y[2], y[3], y[4], y[5], levels, wavelet) for x,y in zip(stack, imw)]
     else:
         stack = [np.reshape(x, (width, height)) for x in stack]
-    save_pic(fname, im_mode, stack)
+    save_pic(fname + "_linear", im_mode, stack)
     save_pic(fname + "_gamma", im_mode, gamma_stretch(stack))
 
 def gamma_stretch(im):

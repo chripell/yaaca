@@ -34,10 +34,12 @@ diro = options.out
 all_frames = AL.expand_args(args)
 noOfFrames = len(all_frames)
 if g==0: g=noOfFrames
-noOfGroups=int(noOfFrames/g)
+noOfGroups = noOfFrames // g
+if noOfFrames % g != 0:
+    noOfGroups = noOfGroups + 1
 for group in xrange(noOfGroups):
     frame0 = group*g
-    frame1 = max(noOfFrames,frame0+g)
+    frame1 = min(noOfFrames,frame0+g)
     (stack, width, height, imw, nim_width, nim_height) = AL.load_stack(all_frames[frame0:], frame1 - frame0, dataMode, im_mode, group)
     if method == 666:
         for mmm in xrange(0, 8):
