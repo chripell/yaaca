@@ -11,3 +11,5 @@ hacking/asi_120mm_usb
 *.ser
 README.html
 *.yaaca
+recorder
+perf.data*
