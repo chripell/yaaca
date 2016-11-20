@@ -17,6 +17,10 @@ recorder: recorder.c
 	gcc -ggdb -pthread -D_GNU_SOURCE -std=c99 -Iinclude -g -c -Wall recorder.c
 	g++ -ggdb -pthread recorder.o ${ASILIB_${ARCH}} -lusb-1.0 -lc -o recorder
 
+recorder-libusb: recorder.c
+	gcc -ggdb -pthread -D_GNU_SOURCE -std=c99 -Iinclude -g -c -Wall recorder.c
+	g++ -ggdb -pthread recorder.o ${ASILIB_${ARCH}} ./libusb-1.0.20/libusb/.libs/libusb-1.0.a -ludev -lc -o recorder-libusb
+
 clean:
 	rm -f *~ *.so.* *.o *.pyc
 
