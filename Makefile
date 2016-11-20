@@ -22,5 +22,6 @@ recorder-libusb: recorder.c
 	g++ -ggdb -pthread recorder.o ${ASILIB_${ARCH}} ./libusb-1.0.20/libusb/.libs/libusb-1.0.a -ludev -lc -o recorder-libusb
 
 clean:
-	rm -f *~ *.so.* *.o *.pyc
+	rm -f *~ *.so.* *.o *.pyc recorder recorder-libusb
+
 

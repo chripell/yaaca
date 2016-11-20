@@ -521,6 +521,7 @@ class CamManager(object):
         self.lgain = self.label(self.sbox, "Gain (q-a,w-s): <b>NA</b>")
         self.lrecording = self.label(self.sbox, "Recording(r): <b>NO</b>")
         self.ldropped = self.label(self.sbox, "Dropped: <b>NA</b>")
+        self.lcapfail = self.label(self.sbox, "Cap/Fail: <b>NA</b>")
         self.lFPS = self.label(self.sbox, "FPS: <b>NA</b>")
         self.last_count = -1
         self.last_tick = 0
@@ -615,6 +616,7 @@ class CamManager(object):
         else:
             self.lrecording.set_markup("Recording (r): <b>NO</b>")
         self.ldropped.set_markup("Dropped: <b>%d / %d</b>" %(s["cam_dropped"], s["dropped"]))
+        self.lcapfail.set_markup("Cap/Fail: <b>%d / %d</b>" %(s["captured"], s["failed"]))
         self.lFPS.set_markup("FPS: %s" % self.calc_fps(s))
         
     def get_image(self):

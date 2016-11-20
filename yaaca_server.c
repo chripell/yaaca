@@ -18,7 +18,7 @@
 #include "ser.h"
 
 #define MAX_IMGS 8
-#define MAX_CONTROL ASI_FAN_ON
+#define MAX_CONTROL ASI_PATTERN_ADJUST
 
 struct control_s {
   long value;
@@ -90,6 +90,7 @@ struct zwo_s {
   int tail;
   int dropped;
   int captured;
+  int failed;
   int ucaptured;
   /* lock_buf */
   pthread_t capture_th;
@@ -214,7 +215,15 @@ static int zwo_open(int idx) {
   id = zwo_id(idx);
   if (id < 0) return id;
   r = ASIOpenCamera(id);
-  if (r != 0) return -1000-r;
+  if (r != 0) {
+    fprintf(stderr, "ASIOpenCamera failed: %d\n", r);
+    return -1000-r;
+  }
+  r = ASIInitCamera(id);
+  if (r != 0) {
+    fprintf(stderr, "ASIInitCamera failed: %d\n", r);
+    return -1000-r;
+  }
   z = &zwo[idx];
   r = ASIGetGainOffset(id, &z->Offset_HighestDR, &z->Offset_UnityGain,
 		       &z->Gain_LowestRN, &z->Offset_LowestRN);
@@ -326,28 +335,25 @@ static void * zwo_capture(void *z_) {
     
     im = z->buf[z->head];
     if (mode & MODE_LONG) {
+      struct timespec ms100 = {0, 100*1000*1000};
+      
       r = ASIGetExpStatus(id, &s.mode_status);
       if (r == ASI_SUCCESS) {
 	switch (s.mode_status) {
 	case ASI_EXP_IDLE:
 	case ASI_EXP_FAILED:
 	  if (s.mode_status == ASI_EXP_FAILED) {
+	    z->failed++;
 	    fprintf(stderr, "Exposure failed!\n");
 	  }
 	  r = ASIStartExposure(id, ASI_FALSE);
 	  if (r == ASI_SUCCESS) {
-	    {
-	      struct timespec halfs = {0, 50000000};
-	      nanosleep(&halfs, NULL);
-	    }
+	    nanosleep(&ms100, NULL);
 	    r = -1;
 	  }
 	  break;
 	case ASI_EXP_WORKING:
-	  {
-	    struct timespec halfs = {0, 50000000};
-	    nanosleep(&halfs, NULL);
-	  }
+	  nanosleep(&ms100, NULL);
 	  r = -1;
 	  break;
 	case ASI_EXP_SUCCESS:
@@ -785,25 +791,20 @@ int zwo_start(int idx) {
   ss = &z->next_save;
   sc->run_capture = 1;
   ss->run_save = 1;
+
+  z->captured = 0;
+  z->ucaptured = 0;
+  z->failed = 0;
   
   z->head = 0;
   z->tail = 0;
   z->ubuf_width = 0;
   z->ubuf_height = 0;
-  if (sc->mode & MODE_LONG) {
+  if (sc->mode & MODE_LONG)
     r = ASIStartExposure(id, ASI_FALSE);
-    if (r != 0) return -1000-r;
-  }
-  else {
+  else
     r = ASIStartVideoCapture(id); 
-    if (r != 0) return -1000-r;
-#if 0
-    {
-      struct timespec halfs = {0, 500000000};
-      nanosleep(&halfs, NULL);
-    }
-#endif
-  }
+  if (r != 0) return -1000-r;
   pthread_create(&z->capture_th, NULL, zwo_capture, z);
   pthread_create(&z->save_th, NULL, zwo_save, z);
   return 0;
@@ -822,13 +823,11 @@ int zwo_stop(int idx) {
   pthread_mutex_unlock(&z->lock_next);
   pthread_join(z->capture_th, NULL);
   pthread_join(z->save_th, NULL);
-  if (!(z->next_capture.mode & MODE_LONG)) {
+  if (z->next_capture.mode & MODE_LONG)
+    r = ASIStopExposure(id);
+  else
     r = ASIStopVideoCapture(id); 
-    if (r != 0) return -1000-r;
-  }
-  else {
-    ASIStopExposure(id);
-  }
+  if (r != 0) return -1000-r;
   return 0;
 }
 
@@ -1069,7 +1068,7 @@ int yaaca_cmd(const char *req, char *resp, int len) {
     struct zwo_s *z;
     struct status_capture_s sc;
     struct status_save_s ss;
-    int dropped, captured, ucaptured;
+    int dropped, captured, ucaptured, failed;
 
     if (idx < 0) return idx;
     z = &zwo[idx];
@@ -1080,6 +1079,7 @@ int yaaca_cmd(const char *req, char *resp, int len) {
     pthread_mutex_lock(&z->lock_buf);
     dropped = z->dropped;
     captured = z->captured;
+    failed = z->failed;
     ucaptured = z->ucaptured;
     pthread_mutex_unlock(&z->lock_buf);
     PRINTF("{\"run_capture\":%d,\"vals\":["
@@ -1114,6 +1114,7 @@ int yaaca_cmd(const char *req, char *resp, int len) {
 	   "\"save_generation\":%d,"
 	   "\"dropped\":%d,"
 	   "\"ucaptured\":%d,"
+	   "\"failed\":%d,"
 	   "\"captured\":%d}",
 	   sc.width,
 	   sc.height,
@@ -1134,6 +1135,7 @@ int yaaca_cmd(const char *req, char *resp, int len) {
 	   ss.save_generation,
 	   dropped,
 	   ucaptured,
+	   failed,
 	   captured);
   }
   else if(!strcmp(buf, "set")) {
