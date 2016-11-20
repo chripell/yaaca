@@ -481,17 +481,17 @@ class ImageManager(object):
         self.stretch_from += diff
         if self.stretch_from < 0:
             self.stretch_from = 0
-        if self.stretch_from > self.stretch_to:
+        if self.stretch_from >= self.stretch_to:
             self.stretch_from = self.stretch_to - 1
-        self.main.queue_draw()
+        self.new_image()
 
     def add_stretch_to(self, diff):
         self.stretch_to += diff
-        if self.stretch_to < self.stretch_from:
+        if self.stretch_to <= self.stretch_from:
             self.stretch_to = self.stretch_from + 1
         if self.stretch_to > 255:
             self.stretch_to = 255
-        self.main.queue_draw()
+        self.new_image()
 
     def mul_box_size(self, inc):
         if inc:
