@@ -541,6 +541,8 @@ class CamManager(object):
             for i,v in enumerate(self.prop()["controls"]):
                 if "ensor temperature" in v["Description"]:
                     self.temp_idx = i
+                if "Exposure Time" in v["Description"]:
+                    self.exp_idx = i
         except IOError as e:
             self.error = str(e)
 
@@ -554,11 +556,14 @@ class CamManager(object):
         if not self.running and self.camera and not self.error:
             self.running = True
             self.ucaptured = -1
+            self.s = self.get()
             self.camera.start()
             self.last_count = -1
+            self.hook(self.s["vals"][self.exp_idx])
 
     def stop(self):
         if self.running:
+            self.unhook()
             self.camera.stop()
             self.running = False
             self.last_count = -1
@@ -594,7 +599,7 @@ class CamManager(object):
             return "%.3f s" % (us / (1000.0 * 1000.0))
 
     def calc_fps(self, s):
-        now = time.clock()
+        now = time.time()
         count = s["captured"]
         if self.last_count < 0:
             self.last_count = count 
@@ -622,7 +627,7 @@ class CamManager(object):
     def get_image(self):
         if not self.periodic:
             return False
-        self.s = self.camera.stat()
+        self.s = self.get()
         self.update_sbox(self.s)
         if self.s["ucaptured"] != self.ucaptured:
             im = self.camera.get_image()
@@ -637,9 +642,14 @@ class CamManager(object):
     def parameters(self):
         return self.list[self.idx]
     
-    def hook(self):
+    def hook(self, exp):
         if not self.periodic and self.running and not self.error:
-            self.periodic = GLib.idle_add(self.get_image)
+            exp /= 2000
+            if exp > 1000:
+                exp = 1000
+            if exp < 50:
+                exp = 50
+            self.periodic = GLib.timeout_add(exp, self.get_image)
 
     def unhook(self):
         if self.periodic:
@@ -647,13 +657,11 @@ class CamManager(object):
             self.periodic = None
             
     def run(self, idx):
-        self.unhook()
         self.stop()
         self.close()
         self.open(idx)
         self.auto_exposure()
         self.start()
-        self.hook()
 
     def modify(self, what, absolute, delta):
         if self.s is None:
