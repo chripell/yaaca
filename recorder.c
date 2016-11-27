@@ -5,14 +5,28 @@
 #include <time.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
 
+#ifdef SELF_BULK
+#include "sb.h"
+#endif
+
 #include "ASICamera2.h"
 #include "ser.h"
 
+#define CHECK1(X) do {						\
+    int r=(X);							\
+    if (r != ASI_SUCCESS) {					\
+      fprintf(stderr, "ASI Error on '%s': %d\n", #X, r);	\
+      exit(1);							\
+    }								\
+  } while(0)
+
 #define CHECK(X) do {						\
+    fprintf(stderr, "%s\n", #X);				\
     int r=(X);							\
     if (r != ASI_SUCCESS) {					\
       fprintf(stderr, "ASI Error on '%s': %d\n", #X, r);	\
@@ -52,18 +66,27 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   CHECK(ASIGetCameraProperty(&prop, cidx));
-  bsize = prop.MaxHeight * prop.MaxWidth * 6;
-  buff = malloc(bsize);
   CHECK(ASIOpenCamera(cidx));
   CHECK(ASIInitCamera(cidx));
   if (width <= 0)
     width = prop.MaxWidth/bin;
   if (height <= 0)
     height = prop.MaxHeight/bin;
+  fprintf(stderr, "%d x %d\n", width, height);
+  bsize = width * height;
+  if (mode == 1)
+    bsize *= 3;
+  else if (mode == 2)
+    bsize *= 2;
+  buff = malloc(bsize);
   CHECK(ASISetROIFormat(cidx, width, height, bin, mode));
   set_cap(ASI_EXPOSURE, exposure * 1000);
   set_cap(ASI_GAIN, gain);
-  if (!lm)
+  set_cap(ASI_HARDWARE_BIN, ASI_TRUE);
+#ifdef SELF_BULK
+  sb_init(bsize);
+#endif
+  if (lm == 0)
     CHECK(ASIStartVideoCapture(cidx));
   while (1) {
     int r;
@@ -71,30 +94,30 @@ int main(int argc, char *argv[]) {
     long delta;
 
     clock_gettime(CLOCK_MONOTONIC, &start);
-    if (lm) {
+    if (lm == 1) {
       ASI_EXPOSURE_STATUS s;
 	
-      CHECK(ASIGetExpStatus(cidx, &s));
+      CHECK1(ASIGetExpStatus(cidx, &s));
       if (s != ASI_EXP_IDLE && s != ASI_EXP_FAILED) {
 	fprintf(stderr, "Not idle or failed: %d\n", s);
 	exit(1);
       }
       CHECK(ASIStartExposure(cidx, 0));
-      fprintf(stderr, "S");
+      fprintf(stderr, "START\n");
       r = 99;			/* timeout */
       do {
 	usleep(10*1000);
 	clock_gettime(CLOCK_MONOTONIC, &stop);
 	delta = (stop.tv_sec - start.tv_sec) * 1000 +
 	  (stop.tv_nsec - start.tv_nsec) / 1000000;
-	CHECK(ASIGetExpStatus(cidx, &s));
+	CHECK1(ASIGetExpStatus(cidx, &s));
 	if (s == ASI_EXP_IDLE) {
+	  fprintf(stderr, "start\n");
 	  CHECK(ASIStartExposure(cidx, 0));
-	  fprintf(stderr, "s");
 	}
 	else if (s == ASI_EXP_SUCCESS) {
 	  r = 0;
-	  fprintf(stderr, "F");
+	  fprintf(stderr, "FINISHED\n");
 	  CHECK(ASIGetDataAfterExp(cidx, buff, bsize));
 	  break;
 	} else if (s == ASI_EXP_FAILED) {
@@ -108,6 +131,7 @@ int main(int argc, char *argv[]) {
       } while (delta < 20 * exposure + 500);
     }
     else {
+      fprintf(stderr, "ASIGetVideoData\n");
       r = ASIGetVideoData(cidx, buff, bsize, 20 * exposure + 500);
       clock_gettime(CLOCK_MONOTONIC, &stop);
       delta = (stop.tv_sec - start.tv_sec) * 1000 +
@@ -117,7 +141,7 @@ int main(int argc, char *argv[]) {
     if (delta > max)
       max = delta;
     sum += delta;
-    fprintf(stderr, "%2d %6.0f(%6d) %ld\n",
+    fprintf(stderr, ":%2d %6.0f(%6d) %ld\n",
 	    r, sum / n, max, delta);
   }
   return 0;

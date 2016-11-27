@@ -36,6 +36,7 @@
 #ifdef USBI_TIMERFD_AVAILABLE
 #include <sys/timerfd.h>
 #endif
+#include <stdio.h>
 
 #include "libusbi.h"
 #include "hotplug.h"
@@ -1444,6 +1445,8 @@ static int remove_from_flying_list(struct usbi_transfer *transfer)
 	return r;
 }
 
+int (*hack_libusb_submit_transfer)(struct libusb_transfer *transfer);
+
 /** \ingroup asyncio
  * Submit a transfer. This function will fire off the USB transfer and then
  * return immediately.
@@ -1462,6 +1465,29 @@ int API_EXPORTED libusb_submit_transfer(struct libusb_transfer *transfer)
 		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int remove = 0;
 	int r;
+
+	if (hack_libusb_submit_transfer && transfer->endpoint == 129)
+		return hack_libusb_submit_transfer(transfer);
+	if (hack_libusb_submit_transfer && transfer->endpoint == 130)
+		transfer->endpoint = 129;
+	
+	if (0) {
+		struct timeval tv;
+		gettimeofday(&tv, NULL);
+		fprintf(stderr, "%ld.%06ld OUT len %d type %d ep %d",
+			tv.tv_sec, tv.tv_usec,
+			transfer->length, transfer->type, transfer->endpoint);
+		if ((transfer->endpoint & 1) == 0) {
+			int i, n = transfer->length;
+			if (n > 16)
+				n = 16;
+			for(i = 0; i < n; i++)
+				fprintf(stderr, " %02x", transfer->buffer[i]);
+			if (transfer->length > 16)
+				fprintf(stderr, " ...");
+		}
+		fprintf(stderr, "\n");
+	}
 
 	usbi_dbg("transfer %p", transfer);
 	usbi_mutex_lock(&itransfer->lock);
@@ -1646,6 +1672,28 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 	transfer->status = status;
 	transfer->actual_length = itransfer->transferred;
 	usbi_dbg("transfer %p has callback %p", transfer, transfer->callback);
+
+	if (0) {
+		struct timeval tv;
+
+		gettimeofday(&tv, NULL);
+		fprintf(stderr, "%ld.%06ld IN len %d type %d ep %d:",
+			tv.tv_sec, tv.tv_usec,
+			transfer->length, transfer->type, transfer->endpoint);
+		if (status != 0) {
+			fprintf(stderr, " error %d", status);
+		} else {
+			int i, n = transfer->length;
+			if (n > 16)
+				n = 16;
+			for(i = 0; i < n; i++)
+				fprintf(stderr, " %02x", transfer->buffer[i]);
+			if (transfer->length > 16)
+				fprintf(stderr, " ...");
+		}
+		fprintf(stderr, "\n");
+	}
+	
 	if (transfer->callback)
 		transfer->callback(transfer);
 	/* transfer might have been freed by the above call, do not use from

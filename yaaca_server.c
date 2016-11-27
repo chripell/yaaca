@@ -16,6 +16,9 @@
 #include "ASICamera2.h"
 #include "jsmn.h"
 #include "ser.h"
+#ifdef SELF_BULK
+#include "sb.h"
+#endif
 
 #define MAX_IMGS 8
 #define MAX_CONTROL ASI_PATTERN_ADJUST
@@ -805,6 +808,16 @@ int zwo_start(int idx) {
   else
     r = ASIStartVideoCapture(id); 
   if (r != 0) return -1000-r;
+
+#ifdef SELF_BULK
+  if (getenv("USE_SB")) {
+    int bsize = sc->width * sc->height;
+    if (sc->type == ASI_IMG_RAW16)
+      bsize *=2;
+    sb_init(bsize);
+  }
+#endif
+  
   pthread_create(&z->capture_th, NULL, zwo_capture, z);
   pthread_create(&z->save_th, NULL, zwo_save, z);
   return 0;
