@@ -37,7 +37,7 @@ void sb_cb(struct libusb_transfer *transfer) {
     transfer->callback = sb_cbs[i];
     sb_cbs[i](transfer);
     if (sb_debug)
-      fprintf(stderr, "done %d t %p\n", i, transfer);
+      fprintf(stderr, "done %d t %p r %d\n", i, transfer, transfer->status);
   }
   if (sb_last_submitted < sb_expected) {
     int r;
