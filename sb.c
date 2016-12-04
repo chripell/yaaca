@@ -25,7 +25,7 @@ static volatile int status;
 static int total, total_i, run;
 static int current, current_i;
 static int debug;
-static int chunk = 1024*1024;
+static int chunk = 1*1024*1024;
 static int inflight = 14;
 static int wait_finish = 0;
 static unsigned char *data;
@@ -64,7 +64,10 @@ static void submit_cb(struct libusb_transfer *transfer) {
   long i = (long) transfer->user_data;
 
   if (debug) {
-    fprintf(stderr, "cb %ld = %d, status %d\n", i, transfer->status, status);
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    fprintf(stderr, "%ld.%06ld cb %ld = %d, status %d\n", tv.tv_sec, tv.tv_usec, i, transfer->status, status);
   }
   if (status != SUBMITTING && transfer->status != LIBUSB_TRANSFER_CANCELLED) {
     fprintf(stderr, "Spurious cb\n");
@@ -154,7 +157,10 @@ static int my_libusb_submit_transfer(struct libusb_transfer *transfer) {
       int r;
 
       if (debug) {
-	fprintf(stderr, "submitting %d\n", run);
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	fprintf(stderr, "%ld.%06ld submitting %d\n", tv.tv_sec, tv.tv_usec, run);
       }
       r = libusb_submit_transfer(my_transfer[run]);
       if (r != 0) {
@@ -181,7 +187,10 @@ static int my_libusb_submit_transfer(struct libusb_transfer *transfer) {
 
 static int my_libusb_cancel_transfer(struct libusb_transfer *transfer) {
   if (debug) {
-    fprintf(stderr, "got cancel %d %p\n", run, transfer);
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    fprintf(stderr, "%ld.%06ld got cancel %d %p\n", tv.tv_sec, tv.tv_usec, run, transfer);
   }
   cancel_trans();
   status = IDLE;
