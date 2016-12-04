@@ -1545,6 +1545,8 @@ out:
 	return r;
 }
 
+int (*hack_libusb_cancel_transfer)(struct libusb_transfer *transfer);
+
 /** \ingroup asyncio
  * Asynchronously cancel a previously submitted transfer.
  * This function returns immediately, but this does not indicate cancellation
@@ -1565,6 +1567,11 @@ int API_EXPORTED libusb_cancel_transfer(struct libusb_transfer *transfer)
 		LIBUSB_TRANSFER_TO_USBI_TRANSFER(transfer);
 	int r;
 
+	if (hack_libusb_cancel_transfer && transfer->endpoint == 129)
+		return hack_libusb_cancel_transfer(transfer);
+	if (hack_libusb_cancel_transfer && transfer->endpoint == 130)
+		transfer->endpoint = 129;
+	
 	usbi_dbg("transfer %p", transfer );
 	usbi_mutex_lock(&itransfer->lock);
 	usbi_mutex_lock(&itransfer->flags_lock);
