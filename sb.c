@@ -14,10 +14,11 @@
 extern int (*hack_libusb_submit_transfer)(struct libusb_transfer *transfer);
 extern int (*hack_libusb_cancel_transfer)(struct libusb_transfer *transfer);
 
-#define SB 40
+#define SBI 50
+#define SBO 5
 
-static struct libusb_transfer *saved_transfer[SB];
-static struct libusb_transfer *my_transfer[SB];
+static struct libusb_transfer *saved_transfer[SBI];
+static struct libusb_transfer *my_transfer[SBO];
 static volatile int status;
 #define IDLE 0
 #define LOADING 1
@@ -25,8 +26,8 @@ static volatile int status;
 static int total, total_i, run;
 static int current, current_i;
 static int debug;
-static int chunk = 1*1024*1024;
-static int inflight = 14;
+static int chunk = 8*1024*1024 - 256*1024;
+static int inflight = 2;
 static int wait_finish = 0;
 static unsigned char *data;
 
@@ -48,6 +49,7 @@ static void signal_all(enum libusb_transfer_status st) {
 
   for(i = 0; i < current_i; i++) {
     saved_transfer[i]->status = st;
+    saved_transfer[i]->timeout = 0;
     saved_transfer[i]->endpoint = 129;
     if (st == 0)
       saved_transfer[i]->actual_length = saved_transfer[i]->length;
@@ -214,7 +216,7 @@ void sb_init(int bsize) {
   if (getenv("SB_WAIT_FINISH"))
     wait_finish = strtoul(getenv("SB_WAIT_FINISH"), NULL, 0);
   total = bsize;
-  for (i=0; i < SB; i++) {
+  for (i=0; i < SBO; i++) {
     my_transfer[i] = libusb_alloc_transfer(0);
     if (!my_transfer[i]) {
       fprintf(stderr, "alloc transfer failed\n");

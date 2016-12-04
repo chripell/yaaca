@@ -587,8 +587,11 @@ class CamManager(object):
         v = s['vals']
         a[0] = False
         a[1] = False
-        v[1] = 1000000
-        self.camera.set({'auto' : a, 'vals': v, 'type': 0})
+        v[1] = 5000000
+        # Set USB bandwidth to 90%
+        a[6] = False
+        v[6] = 90
+        self.camera.set({'auto' : a, 'vals': v, 'type': 2})
 
     def us2s(self, us):
         if us < 1000:
