@@ -1686,16 +1686,16 @@ int usbi_handle_transfer_completion(struct usbi_transfer *itransfer,
 		gettimeofday(&tv, NULL);
 		fprintf(stderr, "%ld.%06ld IN len %d type %d ep %d:",
 			tv.tv_sec, tv.tv_usec,
-			transfer->length, transfer->type, transfer->endpoint);
+			transfer->actual_length, transfer->type, transfer->endpoint);
 		if (status != 0) {
 			fprintf(stderr, " error %d", status);
 		} else {
-			int i, n = transfer->length;
+			int i, n = transfer->actual_length;
 			if (n > 16)
 				n = 16;
 			for(i = 0; i < n; i++)
 				fprintf(stderr, " %02x", transfer->buffer[i]);
-			if (transfer->length > 16)
+			if (transfer->actual_length > 16)
 				fprintf(stderr, " ...");
 		}
 		fprintf(stderr, "\n");
