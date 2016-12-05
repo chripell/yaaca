@@ -14,8 +14,8 @@
 extern int (*hack_libusb_submit_transfer)(struct libusb_transfer *transfer);
 extern int (*hack_libusb_cancel_transfer)(struct libusb_transfer *transfer);
 
-#define SBI 50
-#define SBO 5
+#define SBI 33
+#define SBO 33
 
 static struct libusb_transfer *saved_transfer[SBI];
 static struct libusb_transfer *my_transfer[SBO];
@@ -26,9 +26,10 @@ static volatile int status;
 static int total, total_i, run;
 static int current, current_i;
 static int debug;
-static int chunk = 8*1024*1024 - 256*1024;
-static int inflight = 2;
-static int wait_finish = 0;
+static int big_chunk = 8*1024*1024 - 256*1024;
+static int big_inflight = 2;
+static int small_chunk = 1024*1024;
+static int small_inflight = 15;
 static unsigned char *data;
 
 static void cancel_trans() {
@@ -44,25 +45,20 @@ static void cancel_trans() {
   }
 }
 
-static void signal_all(enum libusb_transfer_status st) {
-  int i;
-
-  for(i = 0; i < current_i; i++) {
-    saved_transfer[i]->status = st;
-    saved_transfer[i]->timeout = 0;
-    saved_transfer[i]->endpoint = 129;
-    if (st == 0)
-      saved_transfer[i]->actual_length = saved_transfer[i]->length;
-    else
-      saved_transfer[i]->actual_length = 0;
-    if (debug) {
-      fprintf(stderr, "signaling %d/%d to %d\n", st, saved_transfer[i]->actual_length, i);
-    }
-    saved_transfer[i]->callback(saved_transfer[i]);
+static void signal_one(enum libusb_transfer_status st, int i) {
+  saved_transfer[i]->status = st;
+  saved_transfer[i]->endpoint = 129;
+  if (st == 0)
+    saved_transfer[i]->actual_length = saved_transfer[i]->length;
+  else
+    saved_transfer[i]->actual_length = 0;
+  if (debug) {
+    fprintf(stderr, "signaling %d/%d to %d\n", st, saved_transfer[i]->actual_length, i);
   }
+  saved_transfer[i]->callback(saved_transfer[i]);
 }
 
-static void submit_cb(struct libusb_transfer *transfer) {
+static void submit_cb_one(struct libusb_transfer *transfer) {
   long i = (long) transfer->user_data;
 
   if (debug) {
@@ -72,7 +68,9 @@ static void submit_cb(struct libusb_transfer *transfer) {
     fprintf(stderr, "%ld.%06ld cb %ld = %d, status %d\n", tv.tv_sec, tv.tv_usec, i, transfer->status, status);
   }
   if (status != SUBMITTING && transfer->status != LIBUSB_TRANSFER_CANCELLED) {
-    fprintf(stderr, "Spurious cb\n");
+    if (debug) {
+      fprintf(stderr, "spurious cb\n");
+    }
   }
   if (transfer->status == LIBUSB_TRANSFER_COMPLETED) {
     if (run < total_i) {
@@ -86,11 +84,62 @@ static void submit_cb(struct libusb_transfer *transfer) {
 	fprintf(stderr, "submit failed: %d\n", r);
 	cancel_trans();
 	status = IDLE;
+	signal_one(LIBUSB_TRANSFER_ERROR, 0);
 	return;
       }
       run++;
     } else if (i == total_i - 1) {
-      signal_all(LIBUSB_TRANSFER_COMPLETED);
+      status = IDLE;
+      signal_one(LIBUSB_TRANSFER_COMPLETED, 0);
+    }
+  }
+  else if (transfer->status == LIBUSB_TRANSFER_CANCELLED) {
+    if (debug) {
+      fprintf(stderr, "cancelled %ld\n", i);
+    }
+  }
+  else {
+    cancel_trans();
+    status = IDLE;
+    signal_one(transfer->status, 0);
+  }
+}
+
+static void submit_cb_stream(struct libusb_transfer *transfer) {
+  long i = (long) transfer->user_data;
+
+  if (debug) {
+    struct timeval tv;
+
+    gettimeofday(&tv, NULL);
+    fprintf(stderr, "%ld.%06ld cb %ld = %d, status %d\n", tv.tv_sec, tv.tv_usec, i, transfer->status, status);
+  }
+  if (status != SUBMITTING && transfer->status != LIBUSB_TRANSFER_CANCELLED) {
+    if (debug) {
+      fprintf(stderr, "spurious cb\n");
+    }
+  }
+  if (transfer->status == LIBUSB_TRANSFER_COMPLETED) {
+    signal_one(LIBUSB_TRANSFER_COMPLETED, i);
+    if (run < total_i) {
+      int r;
+      
+      if (debug) {
+	fprintf(stderr, "submitting %d\n", run);
+      }
+      r = libusb_submit_transfer(my_transfer[run]);
+      if (r != 0) {
+	fprintf(stderr, "submit failed: %d\n", r);
+	cancel_trans();
+	status = IDLE;
+	signal_one(LIBUSB_TRANSFER_ERROR, run);
+	return;
+      }
+      run++;
+    } else if (i == total_i - 1) {
+      if (debug) {
+	fprintf(stderr, "all done\n");
+      }
       status = IDLE;
     }
   }
@@ -101,12 +150,14 @@ static void submit_cb(struct libusb_transfer *transfer) {
   }
   else {
     cancel_trans();
-    signal_all(transfer->status);
     status = IDLE;
+    signal_one(transfer->status, i);
   }
 }
 
 static int my_libusb_submit_transfer(struct libusb_transfer *transfer) {
+  int one = 0;
+  
   if (status == SUBMITTING) {
     fprintf(stderr, "New transfers while submitting.\n");
     cancel_trans();
@@ -114,25 +165,29 @@ static int my_libusb_submit_transfer(struct libusb_transfer *transfer) {
   }
   if (status == IDLE) {
     if (debug) {
-      fprintf(stderr, "First submit %p: %p %d tout %d\n", transfer, transfer->buffer, transfer->length, transfer->timeout);
+      fprintf(stderr, "0 submit %p: %p %d tout %d flags 0x%x\n", transfer, transfer->buffer, transfer->length, transfer->timeout, transfer->flags);
     }
     data = transfer->buffer;
     current = transfer->length;
     current_i = 1;
     saved_transfer[0] = transfer;
+    one = 1;
   }
   if (status == LOADING) {
     if (debug) {
-      fprintf(stderr, "Submit %p: %p %d tout %d\n", transfer, transfer->buffer, transfer->length, transfer->timeout);
+      fprintf(stderr, "%d submit %p: %p %d tout %d flags 0x%x\n", current_i, transfer, transfer->buffer, transfer->length, transfer->timeout, transfer->flags);
     }
     current += transfer->length;
     saved_transfer[current_i] = transfer;
     current_i++;
+    one = 0;
   }
   if (current > 0)
     status = LOADING;
   if (current >= total) {
     int n;
+    int chunk = one ? big_chunk : small_chunk;
+    int inflight = one ? big_inflight : small_inflight;
 
     status = SUBMITTING;
     if (current > total) {
@@ -147,11 +202,10 @@ static int my_libusb_submit_transfer(struct libusb_transfer *transfer) {
       if (debug) {
 	fprintf(stderr, "filling %d: %d\n", total_i, len);
       }
-      if (wait_finish)
-	tout = 1000;
       libusb_fill_bulk_transfer(my_transfer[total_i],
 				saved_transfer[0]->dev_handle, 130,
-				&data[n], len, submit_cb,
+				&data[n], len,
+				one ? submit_cb_one : submit_cb_stream,
 				(void *) (long) total_i, tout);
     }
     run = 0;
@@ -172,16 +226,6 @@ static int my_libusb_submit_transfer(struct libusb_transfer *transfer) {
 	return r;
       }
       run++;
-    }
-    if (wait_finish) {
-      if (debug) {
-	fprintf(stderr, "start wait\n");
-      }
-      while (status != IDLE)
-	sched_yield();
-      if (debug) {
-	fprintf(stderr, "end wait\n");
-      }
     }
   }
   return 0;
@@ -209,12 +253,6 @@ void sb_init(int bsize) {
   
   if (getenv("SB_DEBUG"))
     debug = 1;
-  if (getenv("SB_CHUNK"))
-    chunk = strtoul(getenv("SB_CHUNK"), NULL, 0);
-  if (getenv("SB_INFLIGHT"))
-    inflight = strtoul(getenv("SB_INFLIGHT"), NULL, 0);  
-  if (getenv("SB_WAIT_FINISH"))
-    wait_finish = strtoul(getenv("SB_WAIT_FINISH"), NULL, 0);
   total = bsize;
   for (i=0; i < SBO; i++) {
     my_transfer[i] = libusb_alloc_transfer(0);

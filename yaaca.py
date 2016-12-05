@@ -588,7 +588,7 @@ class CamManager(object):
         a[0] = False
         a[1] = False
         v[1] = 5000000
-        # Set USB bandwidth to 90%
+        # Set USB bandwidth
         a[6] = False
         v[6] = 90
         self.camera.set({'auto' : a, 'vals': v, 'type': 2})
