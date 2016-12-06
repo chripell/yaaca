@@ -650,8 +650,8 @@ class CamManager(object):
             exp /= 2000
             if exp > 1000:
                 exp = 1000
-            if exp < 50:
-                exp = 50
+            if exp < 100:
+                exp = 100
             self.periodic = GLib.timeout_add(exp, self.get_image)
 
     def unhook(self):
