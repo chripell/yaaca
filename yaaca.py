@@ -9,6 +9,9 @@ except ImportError:
 import json
 import numpy as np
 import time
+import os
+import datetime
+import tempfile
 import sys
 
 import gi
@@ -589,8 +592,8 @@ class CamManager(object):
         a[1] = False
         v[1] = 5000000
         # Set USB bandwidth
-        a[6] = False
-        v[6] = 90
+        #a[6] = False
+        #v[6] = 90
         self.camera.set({'auto' : a, 'vals': v, 'type': 2})
 
     def us2s(self, us):
@@ -755,7 +758,99 @@ class Choicer(object):
     def get_text(self):
         return self.value
 
+    
+class CamSim(object):
 
+    def __init__(self, consumer, fname):
+        self.sbox = Gtk.VBox()
+        self.fname = fname
+        self.ser = AL.SerReader(fname, raw=True)
+        self.i = 0
+        self.running = False
+        self.exp = 1000
+        self.consumer = consumer
+        if self.ser.color_id == 9:
+            if self.ser.depth == 16:
+                self.imtype = 2
+                self.auto_debayer = 0
+            else:
+                self.imtype = 0
+                self.auto_debayer = 0
+        elif self.ser.color_id == 0:
+            if self.ser.depth == 16:
+                self.imtype = 2
+                self.auto_debayer = 3
+            else:
+                self.imtype = 3
+                self.auto_debayer = 0
+        elif self.ser.color_id == 101:
+            if self.ser.depth == 16:
+                self.imtype = 2
+                self.auto_debayer = 1
+            else:
+                self.imtype = 1
+                self.auto_debayer = 0
+        else:
+            raise ValueError("Unsupported color_is %d depth %d" % (self.ser.color_id, self.ser.depth))
+
+    def start(self):
+        if not self.running:
+            self.running = True
+            self.periodic = GLib.timeout_add(self.exp, self.get_image)
+
+    def stop(self):
+        self.running = False
+        
+    def get_image(self):
+        if not self.running:
+            return False
+        print "%d/%d" % (self.i, self.ser.count)
+        im = self.ser.get()
+        im.reverse()
+        im = [i.transpose() for i in im]
+        self.i += 1
+        if self.i >= self.ser.count:
+            self.ser = AL.SerReader(self.fname, raw=True)
+            self.i = 0
+        if self.imtype == 2 and self.auto_debayer == 1:
+            im = np.stack(im, axis=-1)
+        self.consumer.new_image(im, self.imtype, self.auto_debayer)
+        return True
+            
+    def open(self, idx):
+        pass
+    
+    def close(self):
+        pass
+    
+    def get(self):
+        return {}
+
+    def prop(self):
+        return {}
+
+    def set(self, s):
+        return None
+            
+    def auto_exposure(self):
+        pass
+    
+    def list(self):
+        return [{'Name':'Simulator'}]
+
+    def run(self, idx):
+        self.start()
+
+    def modify(self, what, absolute, delta):
+        pass
+
+    def save_parameters(self, w):
+        pass
+    
+    def load_parameters(self, w):
+        pass
+    
+        
 class DialogMixin(object):
 
     def _assure_mul(self, w, par, mul):
@@ -988,7 +1083,20 @@ class SettingsDialog(Gtk.Dialog, DialogMixin):
         
         
 class MenuManager(Gtk.MenuBar):
-    
+
+    def _save_snapshot(self, w):
+        if self._im.pb is None:
+            return
+        fname = "yaaca_snap_{:%Y-%m-%d_%H:%M:%S}.jpg".format(datetime.datetime.now())
+        self._im.pb.savev(fname, "jpeg", (), ())
+
+    def _run_ext(self, cmd):
+        if self._im.pb is None:
+            return
+        fname = tempfile.mktemp()
+        self._im.pb.savev(fname, "jpeg", (), ())
+        os.system('%s %s &' % (cmd, fname))
+        
     def __init__(self, parent, camera, im):
         self._parent = parent
         self._camera = camera
@@ -1010,6 +1118,9 @@ class MenuManager(Gtk.MenuBar):
                             "Save parameters", lambda w: self._camera.save_parameters(self._parent))
         self._add_entry(_file_menu,
                             "Load parameters", lambda w: self._camera.load_parameters(self._parent))
+        self._add_separator(_file_menu)
+        self._add_entry(_file_menu, "Save Snapshot", self._save_snapshot)
+        self._add_entry(_file_menu, "Solve", lambda w: self._run_ext('./solver.sh'))
         self._add_separator(_file_menu)
         self._add_entry(_file_menu, "Quit", Gtk.main_quit)
 
@@ -1175,8 +1286,11 @@ class Mainwindow(Gtk.Window):
     def __init__(self, *args, **kwargs):
         Gtk.Window.__init__(self, title="YAACA", default_width=800, default_height=600, *args, **kwargs)
         self.imman = ImageManager()
-        self.camera = CamManager(self.imman)
-        
+
+        if os.getenv("YAACA_SIM"):
+            self.camera = CamSim(self.imman, os.getenv("YAACA_SIM"))
+        else:
+            self.camera = CamManager(self.imman)
 
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.add(box)

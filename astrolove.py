@@ -669,8 +669,21 @@ def expand_args(args):
     return r
 
 (DEBAYER_NONE, DEBAYER_BGGR, DEBAYER_GRBG) = range(3)
-(DEBAYER_VECTOR_MEDIAN, DEBAYER_VECTOR_MEAN) = range(2)
+(DEBAYER_VECTOR_MEDIAN, DEBAYER_VECTOR_MEAN, DEBAYER_SUPER_PIXEL) = range(3)
+
 def demosaic(nim,pattern,method=DEBAYER_VECTOR_MEDIAN):
+    if method <= DEBAYER_VECTOR_MEAN:
+        return demosaic_base(nim, pattern, method)
+    if method == DEBAYER_SUPER_PIXEL:
+        if pattern == DEBAYER_GRBG:
+            g1 = nim[::2,::2]
+            g2 = nim[1::2,1::2]
+            g = (g1.astype(float) + g2) / 2.0
+            r = nim[1::2,::2]
+            b = nim[::2,1::2]
+        return [r, g.astype(np.uint16), b]
+
+def demosaic_base(nim,pattern,method=DEBAYER_VECTOR_MEDIAN):
     print "Demosaic:",nim.shape
     if len(nim.shape)==3:
         nim = np.mean(nim, axis=2)
@@ -795,7 +808,7 @@ class SerWriter:
         if self.channels == 1:
             color_id = 0
         else:
-            color_id = 100
+            color_id = 101
         hdr = struct.pack(SER_HEADER,
                           "LUCAM-RECORDER",
                           0,
@@ -832,8 +845,9 @@ class SerWriter:
             
 class SerReader:
 
-    def __init__(self, in_file, raw=False):
+    def __init__(self, in_file, raw=False, mode=0):
         self.raw = raw
+        self.mode = mode
         if in_file == "-":
             self.fd = sys.stdout
         else:
@@ -861,7 +875,7 @@ class SerReader:
             r = r.transpose()
             if self.raw or self.color_id == 0:
                 return r
-            return demosaic(r, 2, 0)
+            return demosaic(r, 2, self.mode)
         elif self.color_id == 101:
             if self.depth == 8:
                 b = 1
@@ -877,6 +891,6 @@ class SerReader:
                                 ).reshape((self.height, self.width, 3))
             r = [arr[:,:,2], arr[:,:,1], arr[:,:,0]]
             return [x.transpose() for x in r]
-        raise ValueError("Unsupported color_is %d depth %d" % self.color_id, self.depth)
+        raise ValueError("Unsupported color_id %d depth %d" % (self.color_id, self.depth))
 
 
