@@ -1,5 +1,6 @@
 
 import ctypes
+import os
 import json
 import numpy as np
 
@@ -14,7 +15,7 @@ W = 3
 
 c_char_p = ctypes.POINTER(ctypes.c_char)
 
-asi = ctypes.CDLL("libyaaca.so.1")
+asi = ctypes.CDLL(os.path.join(os.path.dirname(__file__), "libyaaca.so.1"))
 
 def check(n):
     # TODO: textual error

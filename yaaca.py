@@ -1,5 +1,10 @@
 #!/usr/bin/python2
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "astrolove"))
+sys.path.append("/usr/lib/astrolove")
+
 import ASI
 try:
     import astrolove as AL
@@ -12,7 +17,6 @@ import time
 import os
 import datetime
 import tempfile
-import sys
 
 import gi
 gi.require_version('Gtk', '3.0')
