@@ -3,11 +3,15 @@
 # register.py
 # outputs: [x] [y] offset for every image
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "astrolove"))
+sys.path.append("/usr/lib/astrolove")
+
 import numpy as np
 import astrolove as AL
 import scipy.signal
 import scipy.ndimage.interpolation
-import sys
 from optparse import OptionParser
 
 parser = OptionParser(usage = "usage: %prog [opts] [files or @file_list ...]")

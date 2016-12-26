@@ -9,9 +9,13 @@
 # kappa-sigma-median -> kappa -> {"kappa":0.5}
 # svd -> noOfSingularValues -> {"noOfSingularValues":3}
 
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "astrolove"))
+sys.path.append("/usr/lib/astrolove")
+
 import numpy as np
 import astrolove as AL
-import sys
 import pywt
 from optparse import OptionParser
 

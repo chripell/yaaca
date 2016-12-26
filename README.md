@@ -24,6 +24,8 @@ is written in Python, but uses NumPy for speed.
 
 ## Installing from HEAD
 
+There are prepackaged archives available in the pkg directory.
+
 The easiest way to get latest version is to clone from github
 repository and compile the C part and launch it:
 
@@ -31,16 +33,22 @@ repository and compile the C part and launch it:
 git clone https://github.com/chripell/yaaca
 cd yaaca
 make
-export LD_LIBRARY_PATH=.
 ./yaaca.py
 ```
 
 ## Using yaaca
 
+First of all, make sure that the correct udevd rules for the ASI
+cameras are installed. Otherwise you won't be able to use them
+as non-root user and the kernel USB buffer might be too small.
+
 After starting yaaca, you need to open an ASI camera from the File
 menu. If there aren't any listened, verify the connection, exit and
 reenter the application. In the same menu you can find the option to
-save and load full camera configuration.
+save and load full camera configuration. In the same menu you can
+find options to snapshot what you currently see on the screen and
+to run an external solver for the field (solve-field must be in
+the path).
 
 In the Camera menu you can find the command to start and stop the
 acquisition. Below There is the record toggle (this can be also
@@ -104,7 +112,4 @@ the size of the box.
 
 Note that you can use cursor keys to send pulses to the ST4 port (and
 so move the telescope if it is connected).
-
-
-
 

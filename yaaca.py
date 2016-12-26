@@ -7,7 +7,7 @@ sys.path.append("/usr/lib/astrolove")
 
 import ASI
 try:
-    import astrolove.astrolove as AL
+    import astrolove as AL
 except ImportError:
     print "Cannot import astrolove, SAA won't work"
 
@@ -1137,7 +1137,10 @@ class MenuManager(Gtk.MenuBar):
                             "Load parameters", lambda w: self._camera.load_parameters(self._parent))
         self._add_separator(_file_menu)
         self._add_entry(_file_menu, "Save Snapshot", self._save_snapshot)
-        self._add_entry(_file_menu, "Solve", lambda w: self._run_ext('./solver.sh'))
+        solver="/usr/lib/astrolove/solver.sh"
+        if os.path.isfile("./solver.sh"):
+            solver="./solver.sh"
+        self._add_entry(_file_menu, "Solve", lambda w: self._run_ext(solver))
         self._add_separator(_file_menu)
         self._add_entry(_file_menu, "Quit", Gtk.main_quit)
 

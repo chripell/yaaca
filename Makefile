@@ -24,5 +24,7 @@ recorder-libusb: recorder.c
 clean:
 	rm -f *~ *.so.* *.o *.pyc recorder recorder-libusb astrolove/*.so.* astrolove/*.pyc
 
+deb: all
+	./make_deb.sh yaaca "Astrocapture for ZWO ASI cams" "libgtk-3-0 (>= 3.10.8), libusb-1.0-0 (>= 2:1.0.17), python (>= 2.7.5), python-gi (>= 3.12.0), python-gi-cairo (>= 3.12.0), python-numpy (>= 1:1.8.2), python-scipy (>= 0.13.3)" yaaca.py,/usr/bin astrolove/libyaaca.so.1,/usr/lib/astrolove astrolove/libyaaca.so.1.0.1,/usr/lib/astrolove astrolove/ASI.py,/usr/lib/astrolove astrolove/__init__.py,/usr/lib/astrolove astrolove/solver.sh,/usr/lib/astrolove altoser.py,/usr/lib/astrolove debayer.py,/usr/lib/astrolove register.py,/usr/lib/astrolove sertoppm.py,/usr/lib/astrolove stack.py,/usr/lib/astrolove astrolove/astrolove.py,/usr/lib/astrolove README.md,/usr/lib/astrolove
 
 
