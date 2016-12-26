@@ -597,10 +597,11 @@ class CamManager(object):
         v = s['vals']
         a[0] = False
         a[1] = False
-        v[1] = 5000000
-        # Set USB bandwidth
-        #a[6] = False
-        #v[6] = 95
+        v[1] = 1000000
+        if "ASI1600" in self.parameters()['Name']:
+            print "Fixing USB bandwidth to 95%"
+            a[6] = False
+            v[6] = 95
         self.camera.set({'auto' : a, 'vals': v, 'type': 2})
 
     def us2s(self, us):
@@ -656,11 +657,11 @@ class CamManager(object):
         return True
 
     def list(self):
-        self.list = ASI.list()
-        return self.list
+        self.asi_list = ASI.list()
+        return self.asi_list
 
     def parameters(self):
-        return self.list[self.idx]
+        return self.asi_list[self.idx]
     
     def hook(self, exp):
         if not self.periodic and self.running and not self.error:
