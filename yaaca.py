@@ -7,7 +7,7 @@ sys.path.append("/usr/lib/astrolove")
 
 import ASI
 try:
-    import astrolove as AL
+    import astrolib as AL
 except ImportError:
     print "Cannot import astrolove, SAA won't work"
 

@@ -6,7 +6,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "astrolove"))
 sys.path.append("/usr/lib/astrolove")
 
 import numpy as np
-import astrolove as AL
+import astrolib as AL
 from optparse import OptionParser
 
 parser = OptionParser(usage = "usage: %prog [opts] in_file out_file")

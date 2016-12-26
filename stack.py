@@ -15,7 +15,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "astrolove"))
 sys.path.append("/usr/lib/astrolove")
 
 import numpy as np
-import astrolove as AL
+import astrolib as AL
 import pywt
 from optparse import OptionParser
 
