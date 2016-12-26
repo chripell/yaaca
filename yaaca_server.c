@@ -631,6 +631,7 @@ static void * zwo_save(void *z_) {
 	z->ubuf_width = width;
 	z->ubuf_height = height;
 	z->ubuf_type = type;
+	z->ubuf_pending = 1;
       }
       pthread_mutex_unlock(&z->lock_ubuf);
 

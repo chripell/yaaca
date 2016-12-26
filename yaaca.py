@@ -7,7 +7,7 @@ sys.path.append("/usr/lib/astrolove")
 
 import ASI
 try:
-    import astrolove as AL
+    import astrolove.astrolove as AL
 except ImportError:
     print "Cannot import astrolove, SAA won't work"
 
@@ -303,6 +303,8 @@ class ImageManager(object):
           if self.view_off_y + self.view_height > self.small_height - 1:
               self.view_off_y = self.small_height - 1 - self.view_height
 
+          if self.small_width == 0 or self.small_height == 0:
+              return
           self.off_x = int(float(self.view_off_x) / self.small_width * real_width)
           self.off_y = int(float(self.view_off_y) / self.small_height * real_height)
 
@@ -533,6 +535,7 @@ class CamManager(object):
         self.last_count = -1
         self.last_tick = 0
         self.fps = 0.0
+        self.exp = 1000
         self.s = None
 
     def label(self, box, txt):
@@ -597,7 +600,7 @@ class CamManager(object):
         v[1] = 5000000
         # Set USB bandwidth
         #a[6] = False
-        #v[6] = 90
+        #v[6] = 95
         self.camera.set({'auto' : a, 'vals': v, 'type': 2})
 
     def us2s(self, us):
@@ -640,9 +643,16 @@ class CamManager(object):
         self.s = self.get()
         self.update_sbox(self.s)
         if self.s["ucaptured"] != self.ucaptured:
+            start = time.time()
             im = self.camera.get_image()
             self.consumer.new_image(im, self.s["type"], self.s["auto_debayer"])
             self.ucaptured = self.s["ucaptured"]
+            duration = (time.time() - start) * 1000
+            exp = self.exp
+            if duration > exp / 1.2:
+                exp = 1.2 * duration
+            self.periodic = GLib.timeout_add(exp, self.get_image)
+            return False
         return True
 
     def list(self):
@@ -654,11 +664,13 @@ class CamManager(object):
     
     def hook(self, exp):
         if not self.periodic and self.running and not self.error:
-            exp /= 2000
+            # To ms, exp is in us
+            exp /= 1000
             if exp > 1000:
                 exp = 1000
             if exp < 100:
                 exp = 100
+            self.exp = exp
             self.periodic = GLib.timeout_add(exp, self.get_image)
 
     def unhook(self):
@@ -817,7 +829,7 @@ class CamSim(object):
             self.ser = AL.SerReader(self.fname, raw=True)
             self.i = 0
         if self.imtype == 2 and self.auto_debayer == 1:
-            im = np.stack(im, axis=-1)
+            im = np.dstack(im)
         self.consumer.new_image(im, self.imtype, self.auto_debayer)
         return True
             
