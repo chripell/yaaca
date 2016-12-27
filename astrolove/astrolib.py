@@ -15,6 +15,11 @@ except ImportError:
     print "Cannot import scipy libraries"
 
 try:
+    import cv2
+except ImportError:
+    print "Cannot import OpenCV"
+    
+try:
     import pywt
 except ImportError:
     print "Cannot import wavelet libraries"
@@ -669,9 +674,9 @@ def expand_args(args):
     return r
 
 (DEBAYER_NONE, DEBAYER_BGGR, DEBAYER_GRBG) = range(3)
-(DEBAYER_VECTOR_MEDIAN, DEBAYER_VECTOR_MEAN, DEBAYER_SUPER_PIXEL) = range(3)
+(DEBAYER_VECTOR_MEDIAN, DEBAYER_VECTOR_MEAN, DEBAYER_SUPER_PIXEL, DEBAYER_OPENCV1) = range(4)
 
-def demosaic(nim,pattern,method=DEBAYER_VECTOR_MEDIAN):
+def demosaic(nim,pattern,method=DEBAYER_OPENCV1):
     if method <= DEBAYER_VECTOR_MEAN:
         return demosaic_base(nim, pattern, method)
     if method == DEBAYER_SUPER_PIXEL:
@@ -682,6 +687,10 @@ def demosaic(nim,pattern,method=DEBAYER_VECTOR_MEDIAN):
             r = nim[1::2,::2]
             b = nim[::2,1::2]
         return [r, g.astype(np.uint16), b]
+    if method == DEBAYER_OPENCV1:
+        if pattern == DEBAYER_GRBG:
+            im = cv2.cvtColor(nim, cv2.COLOR_BAYER_GR2RGB)
+            return [im[:,:,0], im[:,:,1], im[:,:,2]]
 
 def demosaic_base(nim,pattern,method=DEBAYER_VECTOR_MEDIAN):
     print "Demosaic:",nim.shape

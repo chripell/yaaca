@@ -13,8 +13,8 @@ parser = OptionParser(usage = "usage: %prog [opts] in_file out_file")
 
 parser.add_option("--out", type = "string", default = "", help = "output file")
 parser.add_option("--infile", type = "string", default = "", help = "input file")
-parser.add_option("--mode", type = "int", default = 0,
-                      help = "debayer mode: 0 vector median, 1 vector mean, 2 super-pixel")
+parser.add_option("--mode", type = "int", default = 3,
+                      help = "debayer mode")
 (options, args) = parser.parse_args()
 
 in_file = args[0]
