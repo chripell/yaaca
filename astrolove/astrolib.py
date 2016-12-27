@@ -643,8 +643,8 @@ def load_pic(fname, im_mode):
         im = read_ppm(fname + ".ppm")
         im = [0.299 * im[0] + 0.587 * im[1] + 0.114 * im[2]]
     elif im_mode == 10 :
-        nim = np.fromfile(fname + ".np")
-        im == [nim[:,:,0],nim[:,:,1],nim[:,:,2]]
+        nim = np.load(fname + ".npy")
+        im = [nim[:,:,0],nim[:,:,1],nim[:,:,2]]
     else:
         assert False, "Unknown image mode"
     if im_mode == 5 or im_mode == 6:
@@ -664,7 +664,7 @@ def save_pic(fname, im_mode, im):
         write_pgm_255(fname + ".pgm", im[0])
     elif im_mode == 9:
         nim = np.dstack(im)
-        nim.tofile(fname + ".np")
+        np.save(fname, nim)
     else:
         assert False, "Unknown image mode"
 
