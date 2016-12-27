@@ -15,8 +15,11 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "astrolove"))
 sys.path.append("/usr/lib/astrolove")
 
 import numpy as np
-import astrolib as AL
-import pywt
+import astrolib as ALi
+try:
+    import pywt
+except ImportError:
+    print "Cannot import wavelet libraries"
 from optparse import OptionParser
 
 parser = OptionParser(usage = "usage: %prog [opts] [files or @file_list ...]")
