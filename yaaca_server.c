@@ -694,8 +694,8 @@ static void * zwo_save(void *z_) {
 	      break;
 	    }
 	  }
-	  hdr.ImageWidth = z->ubuf_width;
-	  hdr.ImageHeight = z->ubuf_height;
+	  hdr.ImageWidth = z->current_capture.width;
+	  hdr.ImageHeight = z->current_capture.height;
 	  strcpy(hdr.Observer, "YAACA");
 	  strncpy(hdr.Instrument, z->prop.Name, SER_MAX_STRING_LEN);
 	  hdr.Instrument[SER_MAX_STRING_LEN - 1] = '\0';
