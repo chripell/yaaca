@@ -561,7 +561,7 @@ def kalman(stack):
     stack = xhat
     return stack
 
-def load_stack(im_list, n, dataMode, im_mode, group):
+def load_stack(im_list, n, dataMode, im_mode, group, pre_bin):
     width = 0
     height = 0
     stack = []
@@ -570,6 +570,10 @@ def load_stack(im_list, n, dataMode, im_mode, group):
         print "step ", xxx, "/", n - 1, " group ", group,  " loading ", im_list[xxx]
         im = load_pic(im_list[xxx], im_mode)
         im = [x.astype(myfloat) for x in im]
+        if pre_bin > 1:
+            width = im[0].shape[0] / pre_bin
+            height = im[0].shape[1] / pre_bin
+            im = [x.reshape(width, pre_bin, height, pre_bin).mean(axis=(1,3)) for x in im]
         width = im[0].shape[0]
         height = im[0].shape[1]
         if dataMode == 1:

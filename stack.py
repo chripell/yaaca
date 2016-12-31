@@ -29,6 +29,7 @@ parser.add_option("--space", type = "int", default = 0, help = "data space: 0 pl
 parser.add_option("--group", type = "int", default = 0, help = "images x group, 0 is all")
 parser.add_option("--param", type = "string", default = "'[{}]'", help = "list of dict with method prarameters")
 parser.add_option("--out", type = "string", default = "./out", help = "out img without ppm without suffix")
+parser.add_option("--prebin", type = "int", default = 1, help = "bin this way before processing if > 1")
 (options, args) = parser.parse_args()
 
 im_mode = options.imtype
@@ -37,6 +38,7 @@ dataMode = options.space
 g = options.group
 spara = options.param
 diro = options.out
+pre_bin = options.prebin
 
 all_frames = AL.expand_args(args)
 noOfFrames = len(all_frames)
@@ -47,7 +49,7 @@ if noOfFrames % g != 0:
 for group in xrange(noOfGroups):
     frame0 = group*g
     frame1 = min(noOfFrames,frame0+g)
-    (stack, width, height, imw, nim_width, nim_height) = AL.load_stack(all_frames[frame0:], frame1 - frame0, dataMode, im_mode, group)
+    (stack, width, height, imw, nim_width, nim_height) = AL.load_stack(all_frames[frame0:], frame1 - frame0, dataMode, im_mode, group, pre_bin)
     if method == 666:
         for mmm in xrange(0, 8):
             print "multi_method_par for method ", mmm
