@@ -514,6 +514,19 @@ class ImageManager(object):
         self.norm_cross()
         self.main.queue_draw()
 
+    def center_cross(self):
+        self.px = self.im_width / 2
+        self.py = self.im_height / 2
+        self.norm_cross()
+        self.main.queue_draw()
+
+    def center_fov(self):
+        self.small_x = self.small_width / 2
+        self.small_y = self.small_height / 2
+        self.calc()
+        self.main.queue_draw()
+        self.small.queue_draw()
+
 
 class CamManager(object):
 
@@ -1174,6 +1187,8 @@ class MenuManager(Gtk.MenuBar):
         self._add_radio(_view_menu, 'debayer', "Fast debayer", lambda w: self._set_int("auto_debayer", 2), False)
         self._add_separator(_view_menu)
         self._add_check(_view_menu, "Cross", lambda w: self._im.set_cross(w.get_active()))
+        self._add_entry(_view_menu, "Center Cross", lambda w: self._im.center_cross())
+        self._add_entry(_view_menu, "Center FoV", lambda w: self._im.center_fov())
         self._add_check(_view_menu, "Histogram", lambda w: self._im.set_histo(w.get_active()))
         self._add_separator(_view_menu)
         self._do_saa = self._add_check(_view_menu, "SAA", lambda w: self._im.set_saa(w.get_active()))
