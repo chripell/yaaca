@@ -44,4 +44,6 @@ libusb-1.0.20/tests/.deps/
 libusb-1.0.20/tests/Makefile
 *.jpg
 *.ser
+pkg
+src
 

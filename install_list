@@ -1,0 +1,13 @@
+yaaca.py,/usr/bin
+astrolove/libyaaca.so.1,/usr/lib/astrolove
+astrolove/libyaaca.so.1.0.1,/usr/lib/astrolove
+astrolove/ASI.py,/usr/lib/astrolove
+astrolove/__init__.py,/usr/lib/astrolove
+astrolove/solver.sh,/usr/lib/astrolove
+altoser.py,/usr/lib/astrolove
+debayer.py,/usr/lib/astrolove
+register.py,/usr/lib/astrolove
+sertoppm.py,/usr/lib/astrolove
+stack.py,/usr/lib/astrolove
+astrolove/astrolib.py,/usr/lib/astrolove
+README.md,/usr/lib/astrolove

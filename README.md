@@ -24,7 +24,7 @@ is written in Python, but uses NumPy for speed.
 
 ## Installing from HEAD
 
-There are prepackaged archives available in the pkg directory.
+There are prepackaged archives available in the packages directory.
 
 The easiest way to get latest version is to clone from github
 repository and compile the C part and launch it:
