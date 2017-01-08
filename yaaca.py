@@ -166,7 +166,14 @@ class ImageManager(object):
             raise ValueError('Unsupported image format %s in numpy array' % im.dtype)
 
         if self.hist:
-            self.histo_data = np.histogram(imL, bins=self.bins)[0]
+            if self.box_size > 1:
+                x0, x1, y0, y1 = self.get_box()
+                imH = imL[y0:y1, x0:x1]
+            else:
+                imH = imL
+            self.histo_data = np.histogram(imH, bins=self.bins)[0]
+        else:
+            self.histo_data = None
         
         if (self.stretch_from > 0 or self.stretch_to < 255 or
                 self.do_saa or self.do_dark or self.add_dark):
@@ -201,12 +208,12 @@ class ImageManager(object):
             if self.do_saa:
                 if self.nlight == 0:
                     self.fft_box = self.get_box()
-                    nim = imL[self.fft_box[0]:self.fft_box[1], self.fft_box[2]:self.fft_box[3]]
+                    nim = imL[self.fft_box[2]:self.fft_box[3], self.fft_box[0]:self.fft_box[1]]
                     self.fft_ref = np.fft.fft2(nim)
                     self.light = im.astype(np.float)
                     self.nlight = 1
                 else:
-                    nim = imL[self.fft_box[0]:self.fft_box[1], self.fft_box[2]:self.fft_box[3]]
+                    nim = imL[self.fft_box[2]:self.fft_box[3], self.fft_box[0]:self.fft_box[1]]
                     fft = np.fft.fft2(nim, s=self.fft_ref.shape)
                     self.xshift, self.yshift = AL.registration_dft(self.fft_ref, fft)
                     self.light += np.roll(np.roll(im, self.xshift, axis=0), self.yshift, axis=1)
