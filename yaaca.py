@@ -72,9 +72,10 @@ class ImageManager(object):
         self.box_size = 0
         self.ndark = 0
         self.nlight = 0
-        self.do_dark = False
         self.add_dark = False
         self.do_saa = False
+        self.show_raw = True
+        self.current = None
         self.xshift = 0
         self.yshift = 0
         self.disp_im = None
@@ -124,8 +125,9 @@ class ImageManager(object):
     def set_saa(self,v):
         self.do_saa = v
         
-    def sub_dark(self,v):
-        self.do_dark = v
+    def show_saa_dark(self,v):
+        self.show_raw = not v
+        self.new_image()
         
     def do_add_dark(self,v):
         self.add_dark = v
@@ -133,15 +135,10 @@ class ImageManager(object):
     def reset_all(self):
         self.ndark = 0
         self.nlight = 0
-        self.do_dark = False
         self.add_dark = False
         self.do_saa = False
         
     def process_image(self):
-        if not (self.hist or self.do_dark or  self.do_saa or self.add_dark or
-                    self.stretch_from > 0 or self.stretch_to < 255):
-            return self.im, self.imtype, self.auto_debayer
-        
         done = False
         if self.imtype == 1 or (self.imtype == 0 and self.auto_debayer != 0):
             imR = self.im[:,:,0]
@@ -175,59 +172,60 @@ class ImageManager(object):
         else:
             self.histo_data = None
         
-        if (self.stretch_from > 0 or self.stretch_to < 255 or
-                self.do_saa or self.do_dark or self.add_dark):
-            if self.imtype == 1 or (self.imtype == 0 and self.auto_debayer != 0):
-                im = self.im
-                imt = 1
-                adb = 1
-            elif self.imtype == 2 and self.auto_debayer != 0:
-                im = self.im[:,:,2::-1] / 257.0
-                imt = 1
-                adb = 1
-            elif self.imtype == 2 :
-                im = imL
-                imt = 3
-                adb = 0
+        if self.imtype == 1 or (self.imtype == 0 and self.auto_debayer != 0):
+            im = self.im
+            imt = 1
+            adb = 1
+        elif self.imtype == 2 and self.auto_debayer != 0:
+            im = self.im[:,:,2::-1] / 257.0
+            imt = 1
+            adb = 1
+        elif self.imtype == 2 :
+            im = imL
+            imt = 3
+            adb = 0
+        else:
+            im = self.im
+            imt = 3
+            adb = 0
+                
+        if self.add_dark:
+            if self.ndark == 0:
+                self.dark = im.astype(np.float)
+                self.ndark = 1
             else:
-                im = self.im
-                imt = 3
-                adb = 0
+                self.dark += im
+                self.ndark += 1
                 
-            if self.add_dark:
-                if self.ndark == 0:
-                    self.dark = im.astype(np.float)
-                    self.ndark = 1
-                else:
-                    self.dark += im
-                    self.ndark += 1
+        if self.do_saa:
+            if self.nlight == 0:
+                self.fft_box = self.get_box()
+                nim = imL[self.fft_box[2]:self.fft_box[3], self.fft_box[0]:self.fft_box[1]]
+                self.fft_ref = np.fft.fft2(nim)
+                self.light = im.astype(np.float)
+                self.nlight = 1
+            else:
+                nim = imL[self.fft_box[2]:self.fft_box[3], self.fft_box[0]:self.fft_box[1]]
+                fft = np.fft.fft2(nim, s=self.fft_ref.shape)
+                self.xshift, self.yshift = AL.registration_dft(self.fft_ref, fft)
+                self.light += np.roll(np.roll(im, self.xshift, axis=0), self.yshift, axis=1)
+                self.nlight += 1
                 
-            if self.do_dark and self.ndark > 0:
-                im = im - self.dark / self.ndark
-                
-            if self.do_saa:
-                if self.nlight == 0:
-                    self.fft_box = self.get_box()
-                    nim = imL[self.fft_box[2]:self.fft_box[3], self.fft_box[0]:self.fft_box[1]]
-                    self.fft_ref = np.fft.fft2(nim)
-                    self.light = im.astype(np.float)
-                    self.nlight = 1
-                else:
-                    nim = imL[self.fft_box[2]:self.fft_box[3], self.fft_box[0]:self.fft_box[1]]
-                    fft = np.fft.fft2(nim, s=self.fft_ref.shape)
-                    self.xshift, self.yshift = AL.registration_dft(self.fft_ref, fft)
-                    self.light += np.roll(np.roll(im, self.xshift, axis=0), self.yshift, axis=1)
-                    self.nlight += 1
+        self.current = (im, imt, adb)
+        return self.redraw_image()
+
+    def redraw_image(self):
+        im = self.current[0]
+        if not self.show_raw:
+            if self.nlight > 0:
                 im = self.light / self.nlight
-                
-            if self.stretch_from > 0 or self.stretch_to < 255:
-                scale = 255.0 / (self.stretch_to - self.stretch_from)
-                im = (np.clip(im, self.stretch_from, self.stretch_to) - self.stretch_from) * scale
-                    
-            return im.astype(np.uint8), imt, adb
-        
-        return self.im, self.imtype, self.auto_debayer
-        
+            if self.ndark > 0:
+                im = im - self.dark / self.ndark
+        if self.stretch_from > 0 or self.stretch_to < 255:
+            scale = 255.0 / (self.stretch_to - self.stretch_from)
+            im = (np.clip(im, self.stretch_from, self.stretch_to) - self.stretch_from) * scale
+        return im.astype(np.uint8), self.current[1], self.current[2]
+    
     def new_image(self, nim = None, nimtype = None, nauto_debayer = None):
         if nim is not None and nimtype is not None and nauto_debayer is not None:
             if ((nauto_debayer == 2 and nimtype == 0) or
@@ -238,7 +236,12 @@ class ImageManager(object):
                 self.im = nim
             self.imtype = nimtype
             self.auto_debayer = nauto_debayer
-        im, imtype, auto_debayer = self.process_image()
+            im, imtype, auto_debayer = self.process_image()
+        else:
+            if self.current is None:
+                return
+            im, imtype, auto_debayer = self.redraw_image()
+
         l = GdkPixbuf.PixbufLoader.new_with_type('pnm')
         done = False
         self.im_height = im.shape[0]
@@ -1199,10 +1202,10 @@ class MenuManager(Gtk.MenuBar):
         self._add_check(_view_menu, "Histogram", lambda w: self._im.set_histo(w.get_active()))
         self._add_separator(_view_menu)
         self._do_saa = self._add_check(_view_menu, "SAA", lambda w: self._im.set_saa(w.get_active()))
-        self._add_dark = self._add_check(_view_menu, "Sub Dark", lambda w: self._im.sub_dark(
-            w.get_active()))
         self._sub_dark = self._add_check(_view_menu, "Add Dark", lambda w: self._im.do_add_dark(
             w.get_active()))
+        self._add_dark = self._add_check(_view_menu, "Show SAA/Dark",
+                                             lambda w: self._im.show_saa_dark(w.get_active()))
         self._add_entry(_view_menu, "Reset", self._reset_all)
 
         self.show_all
