@@ -24,7 +24,7 @@ from optparse import OptionParser
 
 parser = OptionParser(usage = "usage: %prog [opts] [files or @file_list ...]")
 parser.add_option("--imtype", type = "int", default = 0, help = AL.imtype_help)
-parser.add_option("--method", type = "int", default = 0, help = "method: 0 mean 1 median 2 rank 3 fftrank 4 kappa-sigma 5 kappa-sigma-median 6 svd 7 kalman 666->all the methods!, 1000+method just one with list pars")
+parser.add_option("--method", type = "int", default = 0, help = "method: 0 mean 1 median 2 rank 3 fftrank 4 kappa-sigma 5 kappa-sigma-median 6 svd 7 kalman")
 parser.add_option("--space", type = "int", default = 0, help = "data space: 0 plain, 1 fft, 2 wavelet")
 parser.add_option("--group", type = "int", default = 0, help = "images x group, 0 is all")
 parser.add_option("--param", type = "string", default = "'[{}]'", help = "list of dict with method prarameters")
@@ -46,35 +46,17 @@ if g==0: g=noOfFrames
 noOfGroups = noOfFrames // g
 if noOfFrames % g != 0:
     noOfGroups = noOfGroups + 1
+
+imf = AL.load_pic(all_frames[0], im_mode)
+channels = len(imf)
+    
 for group in xrange(noOfGroups):
     frame0 = group*g
     frame1 = min(noOfFrames,frame0+g)
-    (stack, width, height, imw, nim_width, nim_height) = AL.load_stack(all_frames[frame0:], frame1 - frame0, dataMode, im_mode, group, pre_bin)
-    if method == 666:
-        for mmm in xrange(0, 8):
-            print "multi_method_par for method ", mmm
-            pp = 0
-            for ppp in eval(spara):
-                print "multi_method_par for par ", ppp
-                try:
-                    s = AL.do_stack([x.copy() for x in stack], mmm, ppp, nim_width, nim_height, dataMode)
-                    AL.save_stack(s, width, height, dataMode, im_mode, diro + "_%02d_%02d_%04d"%(mmm, pp, group), imw)
-                except Exception as e:
-                    print(e)
-                    pass
-                pp += 1
-    elif method >= 1000:
-        mmm = method - 1000
-        print "multi_par for method ", mmm
-        pp = 0
-        for ppp in eval(spara):
-            try:
-                s = AL.do_stack([x.copy() for x in stack], mmm, ppp, width, height, dataMode)
-                AL.save_stack(s, width, height, dataMode, im_mode, diro + "_%02d_%02d_%04d"%(mmm, pp, group), imw)
-            except Exception as e:
-                print(e)
-                pass
-            pp += 1
-    else:
+    imf = []
+    for ch in range(channels):
+        (stack, width, height, imw, nim_width, nim_height) = AL.load_stack(all_frames[frame0:], frame1 - frame0, dataMode, im_mode, group, pre_bin, ch)
         stack = AL.do_stack(stack, method, eval(spara), width, height, dataMode)
-        AL.save_stack(stack, width, height, dataMode, im_mode, diro + "_%04d"%(group), imw)
+        imf.append(stack)
+        if ch == (channels -1):
+            AL.save_stack(imf, width, height, dataMode, im_mode, diro + "_%04d"%(group), imw)

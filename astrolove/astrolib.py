@@ -27,7 +27,23 @@ except ImportError:
 myfloat = np.float32
 gamma = 1.0 / 2.2
 
-imtype_help = "image type: 0:ppm, 1:pgm, 2:read ppm and convert to pgm, 3:8bit ppm, 4:8bit pgm, 5:ppm, 8:to 16, 6:pgm 8 to 16 7:pgm debayer 16 8:pgm debayer 8 9:read ppm out raw np 10:read raw np out ppm 11:read pgm out raw np 12:read raw np output pgm 13: read npy out npy norm to 1 14: color npy"
+imtype_help = ("image type: "
+                   "0:ppm, "
+                   "1:pgm, "
+                   "2:read ppm and convert to pgm, "
+                   "3:8bit ppm, "
+                   "4:8bit pgm, "
+                   "5:ppm 8 to 16, "
+                   "6:pgm 8 to 16, "
+                   "7:pgm debayer 16, "
+                   "8:pgm debayer 8, "
+                   "9:read ppm out raw np, "
+                   "10:read raw np out ppm, "
+                   "11:read pgm out raw np, "
+                   "12:read raw np output pgm, "
+                   "13: read npy out npy norm to 1, "
+                   "14: color npy, "
+                   "15: read pgm out npy norm to 1")
 expand_file_list_help = "[files or @file_list ...]"
 
 def read_pgm(filename, byteorder='>'):
@@ -561,55 +577,54 @@ def kalman(stack):
     stack = xhat
     return stack
 
-def load_stack(im_list, n, dataMode, im_mode, group, pre_bin):
+def load_stack(im_list, n, dataMode, im_mode, group, pre_bin, ch):
     width = 0
     height = 0
     stack = []
     imw = []
     for xxx in xrange(n):
         print "step ", xxx, "/", n - 1, " group ", group,  " loading ", im_list[xxx]
-        im = load_pic(im_list[xxx], im_mode)
-        im = [x.astype(myfloat) for x in im]
+        im = load_pic(im_list[xxx], im_mode)[ch]
+        im = im.astype(myfloat)
         if pre_bin > 1:
-            width = im[0].shape[0] / pre_bin
-            height = im[0].shape[1] / pre_bin
-            im = [x.reshape(width, pre_bin, height, pre_bin).mean(axis=(1,3)) for x in im]
-        width = im[0].shape[0]
-        height = im[0].shape[1]
+            width = im.shape[0] / pre_bin
+            height = im.shape[1] / pre_bin
+            im = imreshape(width, pre_bin, height, pre_bin).mean(axis=(1,3))
+        width = im.shape[0]
+        height = im.shape[1]
         if dataMode == 1:
-            im = [np.fft.rfft2(x) for x in im]
-            im = [np.fft.fftshift(x) for x in im]
+            im = np.fft.rfft2(im)
+            im = np.fft.fftshift(im)
         elif dataMode == 2:
-            levels  = int( np.log2(im[0].shape[0]) )
+            levels  = int( np.log2(im.shape[0]) )
             #wavelet = pywt.Wavelet('haar')
             wavelet = pywt.Wavelet('bior1.3')
-            imw = [towav(x, levels, wavelet) for x in im]
-            im = [x[0] for x in imw]
-        nim_width = im[0].shape[0]
-        #nim_height = im[0].shape[1]
+            imw = towav(im, levels, wavelet)
+            im = imw[0]
+        nim_width = im.shape[0]
+        #nim_height = im.shape[1]
         nim_height = 1
         #Flatten the data and build a stack
-        if len(stack)==0:
-            stack = [np.array([x.flatten()]) for x in im]
-        else:
-            stack = map(lambda x: np.append(x[0], np.array([x[1].flatten()]), axis=0), zip(stack,im))
+        stack.append(im.reshape(1, width * height))
+    stack = np.concatenate(stack)
+    print "DELME", stack.shape
     return (stack, width, height, imw, nim_width, nim_height)
 
 def do_stack(stack, method, para, width, height, dataMode):
     if method == 0:
-        stack = [np.mean(x, axis=0) for x in stack]
+        stack = np.mean(stack, axis=0)
     elif method == 1:
-        stack = [np.median(x, axis=0, overwrite_input=True) for x in stack]
+        stack = np.median(stack, axis=0, overwrite_input=True)
     elif method == 2 or method == 3:
-        stack = [rank(method, x, width, height, para) for x in stack]
+        stack = rank(method, stack, width, height, para)
     elif method == 4:
-        stack = [kappasigma(x, para) for x in stack]
+        stack = kappasigma(stack, para)
     elif method == 5:
-        stack = [kappasigmamedian(x, para) for x in stack]
+        stack = kappasigmamedian(stack, para)
     elif method == 6:
-        stack = [svd(x, para) for x in stack]
+        stack = svd(stack, para)
     elif method == 7:
-        stack = [kalman(x) for x in stack]
+        stack = kalman(stack)
     else:
         assert False, "Unknown or unapplicable method"
     return stack
@@ -625,6 +640,7 @@ def save_stack(stack, width, height, dataMode, im_mode, fname, imw):
         wavelet = pywt.Wavelet('bior1.3')
         stack = [fromwav(x, y[1], y[2], y[3], y[4], y[5], levels, wavelet) for x,y in zip(stack, imw)]
     else:
+        print "DELME",[x.shape for x in stack]
         stack = [np.reshape(x, (width, height)) for x in stack]
     save_pic(fname + "_linear", im_mode, stack)
     save_pic(fname + "_gamma", im_mode, gamma_stretch(stack))
@@ -641,7 +657,7 @@ def load_pic(fname, im_mode):
     fname = os.path.splitext(fname)[0]
     if im_mode == 0 or im_mode == 3 or im_mode == 5 or im_mode == 9:
         im = read_ppm(fname + ".ppm")
-    elif im_mode == 1  or im_mode == 4 or im_mode == 6 or im_mode == 7 or im_mode == 8 or im_mode == 11:
+    elif im_mode == 1  or im_mode == 4 or im_mode == 6 or im_mode == 7 or im_mode == 8 or im_mode == 11 or im_mode == 15:
         im = [read_pgm(fname + ".pgm")]
     elif im_mode == 2 :
         im = read_ppm(fname + ".ppm")
@@ -673,7 +689,7 @@ def save_pic(fname, im_mode, im):
         np.save(fname, nim)
     elif im_mode == 11:
         np.save(fname, im[0])
-    elif im_mode == 13:
+    elif im_mode == 13 or im_mode == 15:
         m = im[0].max()
         np.save(fname, im[0] / m)
     else:
