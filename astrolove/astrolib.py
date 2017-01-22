@@ -27,7 +27,7 @@ except ImportError:
 myfloat = np.float32
 gamma = 1.0 / 2.2
 
-imtype_help = "image type: 0:ppm, 1:pgm, 2:read ppm and convert to pgm, 3:8bit ppm, 4:8bit pgm, 5:ppm, 8:to 16, 6:pgm 8 to 16 7:pgm debayer 16 8:pgm debayer 8 9:read ppm out raw np 10:read raw np out ppm"
+imtype_help = "image type: 0:ppm, 1:pgm, 2:read ppm and convert to pgm, 3:8bit ppm, 4:8bit pgm, 5:ppm, 8:to 16, 6:pgm 8 to 16 7:pgm debayer 16 8:pgm debayer 8 9:read ppm out raw np 10:read raw np out ppm 11:read pgm out raw np 12:read raw np output pgm 13: read npy out npy norm to 1 14: color npy"
 expand_file_list_help = "[files or @file_list ...]"
 
 def read_pgm(filename, byteorder='>'):
@@ -641,14 +641,16 @@ def load_pic(fname, im_mode):
     fname = os.path.splitext(fname)[0]
     if im_mode == 0 or im_mode == 3 or im_mode == 5 or im_mode == 9:
         im = read_ppm(fname + ".ppm")
-    elif im_mode == 1  or im_mode == 4 or im_mode == 6 or im_mode == 7 or im_mode == 8:
+    elif im_mode == 1  or im_mode == 4 or im_mode == 6 or im_mode == 7 or im_mode == 8 or im_mode == 11:
         im = [read_pgm(fname + ".pgm")]
     elif im_mode == 2 :
         im = read_ppm(fname + ".ppm")
         im = [0.299 * im[0] + 0.587 * im[1] + 0.114 * im[2]]
-    elif im_mode == 10 :
+    elif im_mode == 10 or im_mode == 14:
         nim = np.load(fname + ".npy")
         im = [nim[:,:,0],nim[:,:,1],nim[:,:,2]]
+    elif im_mode ==12 or im_mode ==13:
+        im = [np.load(fname + ".npy")]
     else:
         assert False, "Unknown image mode"
     if im_mode == 5 or im_mode == 6:
@@ -660,15 +662,20 @@ def save_pic(fname, im_mode, im):
     im = [x.clip(0, 65535) for x in im]
     if im_mode == 0 or im_mode == 5 or im_mode == 7 or im_mode == 10:
         write_ppm_65535(fname + ".ppm", im)
-    elif im_mode == 1 or im_mode == 2 or im_mode == 6:
+    elif im_mode == 1 or im_mode == 2 or im_mode == 6 or im_mode == 12:
         write_pgm_65535(fname + ".pgm", im[0])
     elif im_mode == 3 or im_mode == 8:
         write_ppm_255(fname + ".ppm", im)
     elif im_mode == 4:
         write_pgm_255(fname + ".pgm", im[0])
-    elif im_mode == 9:
+    elif im_mode == 9 or im_mode == 14:
         nim = np.dstack(im)
         np.save(fname, nim)
+    elif im_mode == 11:
+        np.save(fname, im[0])
+    elif im_mode == 13:
+        m = im[0].max()
+        np.save(fname, im[0] / m)
     else:
         assert False, "Unknown image mode"
 

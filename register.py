@@ -21,7 +21,7 @@ parser.add_option("--filter-par", type = "int", default = 0, help = "parameter f
 parser.add_option("--zoom", type = "int", default = 0, help = "zoom if > 0")
 parser.add_option("--dark", type = "string", default = "N", help = "dark frame to subtract")
 parser.add_option("--imtype", type = "int", default = 0, help = AL.imtype_help)
-parser.add_option("--flat", type = "string", default = "N", help = "npy file wit flat to multiply")
+parser.add_option("--flat", type = "string", default = "N", help = "npy file with flat to divide with")
 parser.add_option("--crop-x", type = "int", default = 0, help = "crop x")
 parser.add_option("--crop-y", type = "int", default = 0, help = "crop y")
 parser.add_option("--crop-w", type = "int", default = -1, help = "crop w")
@@ -93,8 +93,7 @@ for n in AL.expand_args(args) :
     imRGB = [x.astype(AL.myfloat) for x in imRGB]
     if dark != "N" :
         imRGB = [x - y for x,y in zip(imRGB, darkf)]
-        #imRGB = [x - x.min() for x in imRGB]
-        imRGB = [x.clip(0, 65535) for x in imRGB]
+        #imRGB = [x.clip(0, 65535) for x in imRGB]
     for defect in defects:
         x = defect[0]
         y = defect[1]
@@ -105,7 +104,7 @@ for n in AL.expand_args(args) :
         if x > 0 and x < (crop_w - 1) :
             for im in imRGB:
                 im[x,:] = (im[x-1,:] + im[x+1,:]) / 2.0
-    if flat != None :
+    if not flat is None :
         imRGB = [x / flat for x in imRGB]
     if im_mode == 7 or im_mode == 8:
         imRGB = AL.demosaic(imRGB[0].astype(np.uint16), options.debayer_pattern, options.debayer_method)
