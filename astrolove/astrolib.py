@@ -577,19 +577,15 @@ def kalman(stack):
     stack = xhat
     return stack
 
-def load_stack(im_list, n, dataMode, im_mode, group, pre_bin, ch):
+def load_stack(im_list, n, dataMode, im_mode, group, ch, x, y, w, h):
     width = 0
     height = 0
     stack = []
     imw = []
     for xxx in xrange(n):
         print "step ", xxx, "/", n - 1, " group ", group,  " loading ", im_list[xxx]
-        im = load_pic(im_list[xxx], im_mode)[ch]
+        im = load_pic(im_list[xxx], im_mode)[ch][x:(x+w),y:(y+h)]
         im = im.astype(myfloat)
-        if pre_bin > 1:
-            width = im.shape[0] / pre_bin
-            height = im.shape[1] / pre_bin
-            im = imreshape(width, pre_bin, height, pre_bin).mean(axis=(1,3))
         width = im.shape[0]
         height = im.shape[1]
         if dataMode == 1:
@@ -601,14 +597,10 @@ def load_stack(im_list, n, dataMode, im_mode, group, pre_bin, ch):
             wavelet = pywt.Wavelet('bior1.3')
             imw = towav(im, levels, wavelet)
             im = imw[0]
-        nim_width = im.shape[0]
-        #nim_height = im.shape[1]
-        nim_height = 1
         #Flatten the data and build a stack
         stack.append(im.reshape(1, width * height))
     stack = np.concatenate(stack)
-    print "DELME", stack.shape
-    return (stack, width, height, imw, nim_width, nim_height)
+    return (stack, width, height, imw)
 
 def do_stack(stack, method, para, width, height, dataMode):
     if method == 0:
@@ -629,21 +621,19 @@ def do_stack(stack, method, para, width, height, dataMode):
         assert False, "Unknown or unapplicable method"
     return stack
 
-def save_stack(stack, width, height, dataMode, im_mode, fname, imw):
+def unpack_stack(stack, width, height, dataMode, imw):
     if dataMode == 1:
-        stack = [np.reshape(x , (width, height/2 + 1)) for x in stack]
-        stack = [np.fft.ifftshift(x) for x in stack]
-        stack = [np.fft.irfft2(x) for x in stack]
+        stack = np.reshape(stack , (width, height/2 + 1))
+        stack = np.fft.ifftshift(stack)
+        stack = np.fft.irfft2(stack)
     elif dataMode == 2:
         levels  = int( np.log2(width) )
         #wavelet = pywt.Wavelet('haar')
         wavelet = pywt.Wavelet('bior1.3')
-        stack = [fromwav(x, y[1], y[2], y[3], y[4], y[5], levels, wavelet) for x,y in zip(stack, imw)]
+        stack = fromwav(stack, imw[1], imw[2], imw[3], imw[4], imw[5], levels, wavelet)
     else:
-        print "DELME",[x.shape for x in stack]
-        stack = [np.reshape(x, (width, height)) for x in stack]
-    save_pic(fname + "_linear", im_mode, stack)
-    save_pic(fname + "_gamma", im_mode, gamma_stretch(stack))
+        stack = np.reshape(stack, (width, height))
+    return stack
 
 def gamma_stretch(im):
     im = [x ** gamma for x in im]

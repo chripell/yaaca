@@ -29,7 +29,8 @@ parser.add_option("--space", type = "int", default = 0, help = "data space: 0 pl
 parser.add_option("--group", type = "int", default = 0, help = "images x group, 0 is all")
 parser.add_option("--param", type = "string", default = "'[{}]'", help = "list of dict with method prarameters")
 parser.add_option("--out", type = "string", default = "./out", help = "out img without ppm without suffix")
-parser.add_option("--prebin", type = "int", default = 1, help = "bin this way before processing if > 1")
+parser.add_option("--chunks", type = "int", default = 1, help = "how many chunks x axis")
+
 (options, args) = parser.parse_args()
 
 im_mode = options.imtype
@@ -38,7 +39,7 @@ dataMode = options.space
 g = options.group
 spara = options.param
 diro = options.out
-pre_bin = options.prebin
+chunks = options.chunks
 
 all_frames = AL.expand_args(args)
 noOfFrames = len(all_frames)
@@ -49,14 +50,27 @@ if noOfFrames % g != 0:
 
 imf = AL.load_pic(all_frames[0], im_mode)
 channels = len(imf)
+
+w, h = imf[0].shape
+(cw, ch) = [i/chunks for i in (w, h)]
+xs = [i*cw for i in range(chunks)]
+ys = [i*ch for i in range(chunks)]
     
 for group in xrange(noOfGroups):
     frame0 = group*g
     frame1 = min(noOfFrames,frame0+g)
     imf = []
-    for ch in range(channels):
-        (stack, width, height, imw, nim_width, nim_height) = AL.load_stack(all_frames[frame0:], frame1 - frame0, dataMode, im_mode, group, pre_bin, ch)
-        stack = AL.do_stack(stack, method, eval(spara), width, height, dataMode)
-        imf.append(stack)
-        if ch == (channels -1):
-            AL.save_stack(imf, width, height, dataMode, im_mode, diro + "_%04d"%(group), imw)
+    for channel in range(channels):
+        im = np.empty((w,h), dtype=AL.myfloat)
+        for x in xs:
+            for y in ys:
+                print "chunk %d-%d,%d-%d,%d"%(x,x+cw,y,y+ch,channel)
+                (stack, width, height, imw) = AL.load_stack(
+                    all_frames[frame0:], frame1 - frame0, dataMode, im_mode, group, channel,
+                    x, y, cw, ch)
+                stack = AL.do_stack(stack, method, eval(spara), width, height, dataMode)
+                im[x:(x+cw),y:(y+ch)] = AL.unpack_stack(stack, width, height, dataMode, imw)
+        imf.append(im)
+    fname = diro + "_%04d"%(group)
+    AL.save_pic(fname + "_linear", im_mode, imf)
+    AL.save_pic(fname + "_gamma", im_mode, AL.gamma_stretch(imf))
