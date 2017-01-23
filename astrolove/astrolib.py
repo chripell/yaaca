@@ -496,7 +496,7 @@ def fromwav(stack, coeffs, cA, cH, cV, cD, levels, wavelet):
 
 def rank(method, stack, width, height, par):
     if method == 2:
-        print "percentile=", par["percentile"]
+        #print "percentile=", par["percentile"]
         p=np.ones((width, height))*par["percentile"]
     else:
         ox,oy = width/2., height/2.
@@ -506,7 +506,7 @@ def rank(method, stack, width, height, par):
         wmid  = par["spectralMidFrequency"]
         pmid  = par["spectralMidRank"]
         phigh = par["spectralHighRank"]
-        print "wmid,pmid,phigh = ", wmid,pmid,phigh
+        #print "wmid,pmid,phigh = ", wmid,pmid,phigh
         a2 = (2.*pmid - 1. - 2.*wmid*phigh + wmid) / (2.*wmid*(wmid-1.))
         a1 = (2.*wmid**2*phigh - wmid**2 - 2.*pmid + 1.) / (2.*wmid*(wmid-1.))
         p = 0.5 + a1*w + a2*w**2
@@ -523,7 +523,7 @@ def rank(method, stack, width, height, par):
     return stack
 
 def kappasigma(stack, par):
-    print "kappa=", par["kappa"]
+    #print "kappa=", par["kappa"]
     median=np.median(stack, axis=0)
     mean=np.mean(stack, axis=0)
     std =np.std (stack, axis=0)
@@ -538,7 +538,7 @@ def kappasigma(stack, par):
     return stack
 
 def kappasigmamedian(stack, par):
-    print "kappa=", par["kappa"]
+    #print "kappa=", par["kappa"]
     noOfFrames=stack.shape[0]
     median=np.median(stack, axis=0)
     mean=np.mean(stack, axis=0)
@@ -553,7 +553,7 @@ def kappasigmamedian(stack, par):
     return stack
 
 def svd(stack, par):
-    print "noOfSingularValues=", par["noOfSingularValues"]
+    #print "noOfSingularValues=", par["noOfSingularValues"]
     U,s,V=fast_svd(stack, par["noOfSingularValues"])
     S = np.diag(s)
     stack = np.dot(U, np.dot(S, V))
@@ -583,7 +583,7 @@ def load_stack(im_list, n, dataMode, im_mode, group, ch, x, y, w, h):
     stack = []
     imw = []
     for xxx in xrange(n):
-        print "step ", xxx, "/", n - 1, " group ", group,  " loading ", im_list[xxx]
+        #print "step ", xxx, "/", n - 1, " group ", group,  " loading ", im_list[xxx]
         im = load_pic(im_list[xxx], im_mode)[ch][x:(x+w),y:(y+h)]
         im = im.astype(myfloat)
         width = im.shape[0]
@@ -716,7 +716,7 @@ def demosaic(nim,pattern,method=DEBAYER_OPENCV1):
             return [im[:,:,0], im[:,:,1], im[:,:,2]]
 
 def demosaic_base(nim,pattern,method=DEBAYER_VECTOR_MEDIAN):
-    print "Demosaic:",nim.shape
+    #print "Demosaic:",nim.shape
     if len(nim.shape)==3:
         nim = np.mean(nim, axis=2)
 

@@ -11,6 +11,7 @@
 
 import sys
 import os
+import multiprocessing
 sys.path.append(os.path.join(os.path.dirname(__file__), "astrolove"))
 sys.path.append("/usr/lib/astrolove")
 
@@ -30,6 +31,7 @@ parser.add_option("--group", type = "int", default = 0, help = "images x group, 
 parser.add_option("--param", type = "string", default = "'[{}]'", help = "list of dict with method prarameters")
 parser.add_option("--out", type = "string", default = "./out", help = "out img without ppm without suffix")
 parser.add_option("--chunks", type = "int", default = 1, help = "how many chunks x axis")
+parser.add_option("--cores", type = "int", default = 1, help = "number of workers to use")
 
 (options, args) = parser.parse_args()
 
@@ -40,6 +42,7 @@ g = options.group
 spara = options.param
 diro = options.out
 chunks = options.chunks
+cores = options.cores
 
 all_frames = AL.expand_args(args)
 noOfFrames = len(all_frames)
@@ -55,22 +58,38 @@ w, h = imf[0].shape
 (cw, ch) = [i/chunks for i in (w, h)]
 xs = [i*cw for i in range(chunks)]
 ys = [i*ch for i in range(chunks)]
-    
+
+def do_chunk(chunk):
+    (frame0, frame1, x, y, cw, cy, channel, group) = chunk
+    print "chunk %d-%d,%d-%d,%d"%(x,x+cw,y,y+ch,channel)
+    (stack, width, height, imw) = AL.load_stack(
+        all_frames[frame0:], frame1 - frame0, dataMode, im_mode, group, channel,
+        x, y, cw, ch)
+    stack = AL.do_stack(stack, method, eval(spara), width, height, dataMode)
+    return AL.unpack_stack(stack, width, height, dataMode, imw)
+
+def get_empty():
+    return np.empty((w, h), dtype=AL.myfloat)
+
+pool = multiprocessing.Pool(cores)
+
 for group in xrange(noOfGroups):
     frame0 = group*g
     frame1 = min(noOfFrames,frame0+g)
-    imf = []
+    todo = []
     for channel in range(channels):
         im = np.empty((w,h), dtype=AL.myfloat)
         for x in xs:
             for y in ys:
-                print "chunk %d-%d,%d-%d,%d"%(x,x+cw,y,y+ch,channel)
-                (stack, width, height, imw) = AL.load_stack(
-                    all_frames[frame0:], frame1 - frame0, dataMode, im_mode, group, channel,
-                    x, y, cw, ch)
-                stack = AL.do_stack(stack, method, eval(spara), width, height, dataMode)
-                im[x:(x+cw),y:(y+ch)] = AL.unpack_stack(stack, width, height, dataMode, imw)
-        imf.append(im)
+                 todo.append((frame0, frame1, x, y, cw, ch, channel, group))
+    pieces = pool.map(do_chunk, todo)
+    if channels == 3:
+        imf = [get_empty(), get_empty(), get_empty()]
+    else:
+        imf = [get_empty()]
+    for i, p in enumerate(todo):
+        (_, _, x, y, cw, cy, channel, _) = p
+        imf[channel][x:(x+cw),y:(y+ch)] = pieces[i]
     fname = diro + "_%04d"%(group)
     AL.save_pic(fname + "_linear", im_mode, imf)
     AL.save_pic(fname + "_gamma", im_mode, AL.gamma_stretch(imf))
