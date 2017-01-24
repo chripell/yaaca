@@ -75,6 +75,7 @@ class ImageManager(object):
         self.add_dark = False
         self.do_saa = False
         self.show_raw = True
+        self.show_fast = False
         self.current = None
         self.xshift = 0
         self.yshift = 0
@@ -129,13 +130,19 @@ class ImageManager(object):
         self.show_raw = not v
         self.new_image()
         
+    def show_fast(self,v):
+        self.show_fast = v
+        self.new_image()
+        
     def do_add_dark(self,v):
         self.add_dark = v
 
-    def reset_all(self):
+    def reset_dark(self):
         self.ndark = 0
-        self.nlight = 0
         self.add_dark = False
+        
+    def reset_saa(self):
+        self.nlight = 0
         self.do_saa = False
         
     def process_image(self):
@@ -236,7 +243,12 @@ class ImageManager(object):
                 self.im = nim
             self.imtype = nimtype
             self.auto_debayer = nauto_debayer
-            im, imtype, auto_debayer = self.process_image()
+            if self.show_fast:
+                im = self.im
+                imtype = self.imtype
+                auto_debayer = self.auto_debayer
+            else:
+                im, imtype, auto_debayer = self.process_image()
         else:
             if self.current is None:
                 return
@@ -1202,11 +1214,14 @@ class MenuManager(Gtk.MenuBar):
         self._add_check(_view_menu, "Histogram", lambda w: self._im.set_histo(w.get_active()))
         self._add_separator(_view_menu)
         self._do_saa = self._add_check(_view_menu, "SAA", lambda w: self._im.set_saa(w.get_active()))
+        self._add_entry(_view_menu, "Reset SAA", self._reset_saa)
         self._sub_dark = self._add_check(_view_menu, "Add Dark", lambda w: self._im.do_add_dark(
             w.get_active()))
+        self._add_entry(_view_menu, "Reset Dark", self._reset_dark)
         self._add_dark = self._add_check(_view_menu, "Show SAA/Dark",
                                              lambda w: self._im.show_saa_dark(w.get_active()))
-        self._add_entry(_view_menu, "Reset", self._reset_all)
+        self._show_fast = self._add_check(_view_menu, "Show Fast",
+                                             lambda w: self._im.show_fast(w.get_active()))
 
         self.show_all
 

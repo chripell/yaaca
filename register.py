@@ -13,11 +13,12 @@ import numpy as np
 import astrolib as AL
 import scipy.signal
 import scipy.ndimage.interpolation
+import imreg
 
 from optparse import OptionParser
 
 parser = OptionParser(usage = "usage: %prog [opts] [files or @file_list ...]")
-parser.add_option("--method", type = "int", default = 0, help = "0 FFT, 1 FFT Canny, 2 geometric, 100 none")
+parser.add_option("--method", type = "int", default = 0, help = "0 FFT, 1 FFT Canny, 2 geometric, 3 imreg, 100 none")
 parser.add_option("--filter", type = "int", default = 0, help = "0 none 1 median 2 wavelet only ROI: 101 median  102 wavelet")
 parser.add_option("--filter-par", type = "int", default = 0, help = "parameter for filter")
 parser.add_option("--zoom", type = "int", default = 0, help = "zoom if > 0")
@@ -89,7 +90,6 @@ def prev_pow(x):
 
 def prepare_image(n):
     global crop_w, crop_h, roi_w, roi_h, roi_x, roi_y
-    print "Loading image", n
     imRGB = AL.load_pic(n, im_mode)
     if crop_w == -1 :
         crop_w = imRGB[0].shape[0]
@@ -153,6 +153,8 @@ def get_ref(nim):
     elif method == 2:
         yref,xref = AL.geometric_median(nim,threshold=0.8*np.max(nim))
         ref = (yref,xref)
+    elif method == 3:
+        ref = nim
     else:
         ret = None
     return ref
@@ -170,20 +172,26 @@ def save_image(idx, imout):
 def process_image(ii):
     (idx, n, ref) = ii
     (imRGB, nim) = prepare_image(n)
+    angle = 0
+    success = 1
     if method == 0 or method == 1 :
         fft = np.fft.fft2(nim,s=ref.shape)
         xshift,yshift = AL.registration_dft(ref, fft)
-        shift = (xshift, yshift)
-        imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
     elif method == 2:
         (yref,xref) = ref
         my,mx = AL.geometric_median(nim,threshold=0.8*np.max(nim))
         yshift,xshift = int(yref-my), int(xref-mx)
-        imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
-        shift = (xshift, yshift)
+    elif method == 3:
+        tran = imreg.translation(ref, nim)
+        xshift = int(round(tran['tvec'][0]))
+        yshift = int(round(tran['tvec'][1]))
+        angle = tran['angle']
+        success = tran['success']
     else:
-        shift = (0,0)
-        imout = imRGB
+        xshift = 0
+        yshift = 0
+    print "%s: %d,%d %f %f" % (n, xshift, yshift, angle, success)
+    imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
     save_image(idx, imout)
     
 
