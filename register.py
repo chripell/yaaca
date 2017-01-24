@@ -5,6 +5,7 @@
 
 import sys
 import os
+import multiprocessing
 sys.path.append(os.path.join(os.path.dirname(__file__), "astrolove"))
 sys.path.append("/usr/lib/astrolove")
 
@@ -12,6 +13,7 @@ import numpy as np
 import astrolib as AL
 import scipy.signal
 import scipy.ndimage.interpolation
+
 from optparse import OptionParser
 
 parser = OptionParser(usage = "usage: %prog [opts] [files or @file_list ...]")
@@ -35,6 +37,8 @@ parser.add_option("--defect", type = "string", default = "", help = "defect list
 parser.add_option("--defect-col", type = "string", default = "", help = "defect column list: one per line")
 parser.add_option("--debayer-pattern", type = "int", default = 1, help = "0:none 1:bggr 2:grbg")
 parser.add_option("--debayer-method", type = "int", default = 0, help = "0:median 1:mean")
+parser.add_option("--save-npy", type = "int", default = 0, help = "if non zero save npy of image as well")
+parser.add_option("--cores", type = "int", default = 1, help = "number of workers to use")
 (options, args) = parser.parse_args()
 
 method = options.method
@@ -56,6 +60,8 @@ roi_y = options.roi_y
 roi_w = options.roi_w
 roi_h = options.roi_h
 dir = options.out_dir
+save_npy = options.save_npy
+cores = options.cores
 
 defects = []
 if options.defect != "" :
@@ -74,18 +80,25 @@ if dark != "N" :
 
 ref = None
 debug = False
-no = 0
 
-for n in AL.expand_args(args) :
+def prev_pow(x):
+    p = 1
+    while p < x:
+        p *= 2
+    return p / 2
+
+def prepare_image(n):
+    global crop_w, crop_h, roi_w, roi_h, roi_x, roi_y
+    print "Loading image", n
     imRGB = AL.load_pic(n, im_mode)
     if crop_w == -1 :
         crop_w = imRGB[0].shape[0]
     if crop_h == -1 :
         crop_h = imRGB[0].shape[1]
     if roi_w == -1 :
-        roi_w = crop_w
+        roi_w = prev_pow(crop_w / 2)
     if roi_h == -1 :
-        roi_h = crop_h
+        roi_h = prev_pow(crop_h / 2)
     if roi_x == -1 :
         roi_x = (imRGB[0].shape[0] - roi_w) / 2
     if roi_y == -1 :
@@ -132,28 +145,53 @@ for n in AL.expand_args(args) :
         AL.save_pic(dir + "roi_area_%04d"%(no), 1, [nim])
     if method == 1 :
         nim = AL.canny(nim, sigma = 3)
+    return imRGB, nim
+
+def get_ref(nim):
     if method == 0 or method == 1 :
-        if ref is None :
-            imout = imRGB
-            ref = np.fft.fft2(nim)
-            print "0 0"
-        else:
-            fft = np.fft.fft2(nim,s=ref.shape)
-            xshift,yshift = AL.registration_dft(ref, fft)
-            print "%d %d"%(xshift, yshift)
-            imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
+        ref = np.fft.fft2(nim)
     elif method == 2:
-        if ref == None :
-            imout = imRGB
-            ref = nim
-            yref,xref = AL.geometric_median(ref,threshold=0.8*np.max(ref))
-            print "0 0"
-        else:
-            my,mx = AL.geometric_median(nim,threshold=0.8*np.max(nim))
-            yshift,xshift = int(yref-my), int(xref-mx)
-            imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
-            print "%d %d"%(xshift, yshift)
+        yref,xref = AL.geometric_median(nim,threshold=0.8*np.max(nim))
+        ref = (yref,xref)
     else:
+        ret = None
+    return ref
+
+def save_image(idx, imout):
+    fname = dir + "registered_%05d"%(idx)
+    AL.save_pic(fname, im_mode, imout)
+    if save_npy != 0:
+        if len(imout) == 3:
+            nim = np.dstack(imout)
+            np.save(fname, nim)
+        else:
+            np.save(fname, imout[0])
+
+def process_image(ii):
+    (idx, n, ref) = ii
+    (imRGB, nim) = prepare_image(n)
+    if method == 0 or method == 1 :
+        fft = np.fft.fft2(nim,s=ref.shape)
+        xshift,yshift = AL.registration_dft(ref, fft)
+        shift = (xshift, yshift)
+        imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
+    elif method == 2:
+        (yref,xref) = ref
+        my,mx = AL.geometric_median(nim,threshold=0.8*np.max(nim))
+        yshift,xshift = int(yref-my), int(xref-mx)
+        imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
+        shift = (xshift, yshift)
+    else:
+        shift = (0,0)
         imout = imRGB
-    AL.save_pic(dir + "registered_%05d"%(no), im_mode, imout)
-    no = no + 1
+    save_image(idx, imout)
+    
+
+all = AL.expand_args(args)
+base, nim = prepare_image(all[0])
+ref = get_ref(nim)
+save_image(0, base)
+todo = [(idx, im, ref) for idx, im in enumerate(all[1:])]
+
+pool = multiprocessing.Pool(cores)
+pool.map(process_image, todo)
