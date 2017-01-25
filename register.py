@@ -192,7 +192,7 @@ def process_image(ii):
         yshift = 0
     print "%s: %d,%d %f %f" % (n, xshift, yshift, angle, success)
     imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
-    save_image(idx, imout)
+    save_image(idx + 1, imout)
     
 
 all = AL.expand_args(args)
