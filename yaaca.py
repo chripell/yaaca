@@ -75,7 +75,7 @@ class ImageManager(object):
         self.add_dark = False
         self.do_saa = False
         self.show_raw = True
-        self.show_fast = False
+        self.show_fst = False
         self.current = None
         self.xshift = 0
         self.yshift = 0
@@ -131,7 +131,7 @@ class ImageManager(object):
         self.new_image()
         
     def show_fast(self,v):
-        self.show_fast = v
+        self.show_fst = v
         self.new_image()
         
     def do_add_dark(self,v):
@@ -243,7 +243,7 @@ class ImageManager(object):
                 self.im = nim
             self.imtype = nimtype
             self.auto_debayer = nauto_debayer
-            if self.show_fast:
+            if self.show_fst:
                 im = self.im
                 imtype = self.imtype
                 auto_debayer = self.auto_debayer
@@ -1214,10 +1214,10 @@ class MenuManager(Gtk.MenuBar):
         self._add_check(_view_menu, "Histogram", lambda w: self._im.set_histo(w.get_active()))
         self._add_separator(_view_menu)
         self._do_saa = self._add_check(_view_menu, "SAA", lambda w: self._im.set_saa(w.get_active()))
-        self._add_entry(_view_menu, "Reset SAA", self._reset_saa)
+        self._add_entry(_view_menu, "Reset SAA", lambda w: self._im.reset_saa())
         self._sub_dark = self._add_check(_view_menu, "Add Dark", lambda w: self._im.do_add_dark(
             w.get_active()))
-        self._add_entry(_view_menu, "Reset Dark", self._reset_dark)
+        self._add_entry(_view_menu, "Reset Dark", lambda w: self._im.reset_dark())
         self._add_dark = self._add_check(_view_menu, "Show SAA/Dark",
                                              lambda w: self._im.show_saa_dark(w.get_active()))
         self._show_fast = self._add_check(_view_menu, "Show Fast",
