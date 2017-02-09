@@ -50,6 +50,7 @@ class ImageManager(object):
         self.histo_box.pack_start(l, False, False, 0)
 
         self.info_box = Gtk.Label()
+        self.info_box.set_justify(Gtk.Justification.CENTER)
         self.info_box.set_markup("Not started")
         
         self.zoom = 1.0
@@ -92,7 +93,14 @@ class ImageManager(object):
             else:
                 s = s + "\nValue: %d" % int(self.disp_im[self.py,self.px])
         if self.do_saa:
-            s += "\nSAA: %d,%d" % (self.xshift, self.yshift)
+            s += "\nSAA off: %d,%d" % (self.xshift, self.yshift)
+        if self.show_fst:
+            mode = "Raw"
+        elif self.show_raw:
+            mode = "Processed"
+        else:
+            mode = "SAA/Dark"
+        s += "\n<b>%s</b> light: %d dark: %d" % (mode, self.nlight, self.ndark)
         self.info_box.set_markup(s)
 
     def get_box(self):
