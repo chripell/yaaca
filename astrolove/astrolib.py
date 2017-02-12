@@ -636,11 +636,11 @@ def unpack_stack(stack, width, height, dataMode, imw):
         stack = np.reshape(stack, (width, height))
     return stack
 
-def gamma_stretch(im):
+def gamma_stretch(im, mv=65535.0):
     im = [x ** gamma for x in im]
     mi = min([x.min() for x in im])
     ma = max([x.max() for x in im])
-    k = 65535.0 / (ma - mi)
+    k = mv / (ma - mi)
     im = [ (x - mi) * k for x in im]
     return im
 

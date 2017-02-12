@@ -81,6 +81,7 @@ class ImageManager(object):
         self.xshift = 0
         self.yshift = 0
         self.disp_im = None
+        self.gamma_stretch = False
 
     def update_info(self):
         s = "<b>%d</b>,<b>%d</b> box(b,n) <b>%d</b>\nstretch: <b>%d-%d</b>" % (
@@ -145,6 +146,9 @@ class ImageManager(object):
     def do_add_dark(self,v):
         self.add_dark = v
 
+    def do_gamma_stretch(self,v):
+        self.gamma_stretch = v
+
     def reset_dark(self):
         self.ndark = 0
         self.add_dark = False
@@ -183,6 +187,8 @@ class ImageManager(object):
                 imH = imL[y0:y1, x0:x1]
             else:
                 imH = imL
+            if self.gamma_stretch:
+                imH = AL.gamma_stretch([imH], mv=255.0)[0]
             self.histo_data = np.histogram(imH, bins=self.bins)[0]
         else:
             self.histo_data = None
@@ -236,6 +242,8 @@ class ImageManager(object):
                 im = self.light / self.nlight
             if self.ndark > 0:
                 im = im - self.dark / self.ndark
+        if self.gamma_stretch:
+            im = AL.gamma_stretch([im], mv=255.0)[0]
         if self.stretch_from > 0 or self.stretch_to < 255:
             scale = 255.0 / (self.stretch_to - self.stretch_from)
             im = (np.clip(im, self.stretch_from, self.stretch_to) - self.stretch_from) * scale
@@ -1233,6 +1241,8 @@ class MenuManager(Gtk.MenuBar):
                                              lambda w: self._im.show_saa_dark(w.get_active()))
         self._show_fast = self._add_check(_view_menu, "Show Fast",
                                              lambda w: self._im.show_fast(w.get_active()))
+        self._gamma_stretch = self._add_check(_view_menu, "Gamma Stretch", lambda w: self._im.do_gamma_stretch(
+            w.get_active()))
 
         self.show_all
 
