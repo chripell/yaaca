@@ -1222,30 +1222,45 @@ class MenuManager(Gtk.MenuBar):
                             "Zoom %sx" % c,
                             lambda w, c=c: self._im.set_zoom(c),
                             active)
+            
         self._add_separator(_view_menu)
         self._add_radio(_view_menu, 'debayer', "Raw", lambda w: self._set_int("auto_debayer", 0), True)
         self._add_radio(_view_menu, 'debayer', "Full debayer", lambda w: self._set_int("auto_debayer", 1), False)
         self._add_radio(_view_menu, 'debayer', "Fast debayer", lambda w: self._set_int("auto_debayer", 2), False)
+        
         self._add_separator(_view_menu)
         self._add_check(_view_menu, "Cross", lambda w: self._im.set_cross(w.get_active()))
         self._add_entry(_view_menu, "Center Cross", lambda w: self._im.center_cross())
         self._add_entry(_view_menu, "Center FoV", lambda w: self._im.center_fov())
         self._add_check(_view_menu, "Histogram", lambda w: self._im.set_histo(w.get_active()))
+        
         self._add_separator(_view_menu)
         self._do_saa = self._add_check(_view_menu, "SAA", lambda w: self._im.set_saa(w.get_active()))
         self._add_entry(_view_menu, "Reset SAA", lambda w: self._im.reset_saa())
         self._sub_dark = self._add_check(_view_menu, "Add Dark", lambda w: self._im.do_add_dark(
             w.get_active()))
         self._add_entry(_view_menu, "Reset Dark", lambda w: self._im.reset_dark())
-        self._add_dark = self._add_check(_view_menu, "Show SAA/Dark",
-                                             lambda w: self._im.show_saa_dark(w.get_active()))
-        self._show_fast = self._add_check(_view_menu, "Show Fast",
-                                             lambda w: self._im.show_fast(w.get_active()))
         self._gamma_stretch = self._add_check(_view_menu, "Gamma Stretch", lambda w: self._im.do_gamma_stretch(
             w.get_active()))
+        
+        self._add_separator(_view_menu)
+        self._add_radio(_view_menu, 'disp_mode', "Show Processed", lambda w: self._set_disp_mode("Show Processed"), True)
+        self._add_radio(_view_menu, 'disp_mode', "Show SAA/Dark", lambda w: self._set_disp_mode("Show SAA/Dark"), False)
+        self._add_radio(_view_menu, 'disp_mode', "Show Raw", lambda w: self._set_disp_mode("Show Raw"), False)
 
         self.show_all
 
+    def _set_disp_mode(self, disp_mode):
+        if disp_mode == "Show SAA/Dark":
+            self._im.show_saa_dark(True)
+            self._im.show_fast(False)
+        elif disp_mode == "Show Raw":
+            self._im.show_saa_dark(False)
+            self._im.show_fast(True)
+        else:
+            self._im.show_saa_dark(False)
+            self._im.show_fast(False)
+        
     def _do_toggle(self, w):
         w.set_active(not w.get_active())
 

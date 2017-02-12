@@ -84,16 +84,32 @@ in 1) or full debayer. This is useful only for color cameras of
 course. Next section is for enabling the cross pointer and the
 histogram. The cross pointer also have a boxed areas (that can be
 resized with keys b and n) that specifies which part of the picture
-will be used by various operations (like SAA).
+will be used by various operations (like SAA and histogram).
 
-The last part of the view menu allows you to stack multiple images on
-the fly. With *SAA*, the area defined by the box is used to calculate
-the offset of the captured image to the first, reference, one. The
-image is then shifted and added to the reference and the result is
-shown. With *Sub Dark* a dark reference is subtracted before
-displaying. The dark frame is built while *Add Dark* is selected. Of
-course you must cover your telescope before selecting it. The last
-option resets all stacking and enables real-time displaying.
+The part part below in the view menu allows you to stack multiple
+images on the fly. With *SAA*, the area defined by the box is used to
+calculate the offset of the captured image to the first, reference,
+one. The image is then shifted and added to the reference and the
+result is shown. The amount of shifting is visible in the right
+pane. The dark frame is built while *Add Dark* is selected. Of course
+you must cover your telescope before selecting it. The reset entries
+zero the accumulated frames (the number of light/dark is available in
+the right pane).
+
+Gamma stretch applies a gamma function to enhance the visibility of
+faint details. The last part of the view menu allows you to select the
+view mode. It can be:
+
+* *Show Processed*, stretching of the histogram, gamma stretch and
+  other processing is visible.
+  
+* *Show SAA/Dark*, the accumulated image with dark subtracted is
+  shown.
+  
+* *Show Raw*, raw image from the camera is displayed. This is useful
+  for slow computers or as a sanity check about what is saved (only
+  the debayering is applied, set it to *Raw* if you don't want to see
+  it as well).
 
 The application window is dived in 2 part. The main of the left shows
 the image acquired (or elaborated by SAA or such) and can be zoomed
