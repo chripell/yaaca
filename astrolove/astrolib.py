@@ -43,7 +43,8 @@ imtype_help = ("image type: "
                    "12:read raw np output pgm, "
                    "13: read npy out npy norm to 1, "
                    "14: color npy, "
-                   "15: read pgm out npy norm to 1")
+                   "15: read pgm out npy norm to 1, "
+                   "16: read pgm, debayer multiple")
 expand_file_list_help = "[files or @file_list ...]"
 
 def read_pgm(filename, byteorder='>'):
@@ -647,7 +648,7 @@ def load_pic(fname, im_mode):
     fname = os.path.splitext(fname)[0]
     if im_mode == 0 or im_mode == 3 or im_mode == 5 or im_mode == 9:
         im = read_ppm(fname + ".ppm")
-    elif im_mode == 1  or im_mode == 4 or im_mode == 6 or im_mode == 7 or im_mode == 8 or im_mode == 11 or im_mode == 15:
+    elif im_mode == 1  or im_mode == 4 or im_mode == 6 or im_mode == 7 or im_mode == 8 or im_mode == 11 or im_mode == 15 or im_mode == 16:
         im = [read_pgm(fname + ".pgm")]
     elif im_mode == 2 :
         im = read_ppm(fname + ".ppm")
@@ -666,7 +667,7 @@ def load_pic(fname, im_mode):
 def save_pic(fname, im_mode, im):
     fname = os.path.splitext(fname)[0]
     im = [x.clip(0, 65535) for x in im]
-    if im_mode == 0 or im_mode == 5 or im_mode == 7 or im_mode == 10:
+    if im_mode == 0 or im_mode == 5 or im_mode == 7 or im_mode == 10 or im_mode == 16:
         write_ppm_65535(fname + ".ppm", im)
     elif im_mode == 1 or im_mode == 2 or im_mode == 6 or im_mode == 12:
         write_pgm_65535(fname + ".pgm", im[0])
@@ -906,7 +907,7 @@ class SerReader:
                             ).reshape((self.height, self.width))
             r = r.transpose()
             if self.raw or self.color_id == 0:
-                return r
+                return [r]
             return demosaic(r, 2, self.mode)
         elif self.color_id == 101:
             if self.depth == 8:

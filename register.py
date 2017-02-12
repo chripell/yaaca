@@ -36,12 +36,14 @@ parser.add_option("--roi-h", type = "int", default = -1, help = "roi h")
 parser.add_option("--out-dir", type = "string", default = "./", help = "output dir, default to current")
 parser.add_option("--defect", type = "string", default = "", help = "defect list: x,y one per line")
 parser.add_option("--defect-col", type = "string", default = "", help = "defect column list: one per line")
-parser.add_option("--debayer-pattern", type = "int", default = 1, help = "0:none 1:bggr 2:grbg")
-parser.add_option("--debayer-method", type = "int", default = 0, help = "0:median 1:mean")
+parser.add_option("--debayer-pattern", type = "int", default = 2, help = "0:none 1:bggr 2:grbg")
+parser.add_option("--debayer-method", type = "int", default = 3, help = "0:median 1:mean 2:super_pixel 3:opencv")
 parser.add_option("--save-npy", type = "int", default = 0, help = "if non zero save npy of image as well")
 parser.add_option("--cores", type = "int", default = 1, help = "number of workers to use")
 (options, args) = parser.parse_args()
 
+debayer_method = options.debayer_method
+debayer_pattern = options.debayer_pattern
 method = options.method
 filter = options.filter
 filter_par = options.filter_par
@@ -90,6 +92,7 @@ def prev_pow(x):
 
 def prepare_image(n):
     global crop_w, crop_h, roi_w, roi_h, roi_x, roi_y
+    imSP = None
     imRGB = AL.load_pic(n, im_mode)
     if crop_w == -1 :
         crop_w = imRGB[0].shape[0]
@@ -104,9 +107,9 @@ def prepare_image(n):
     if roi_y == -1 :
         roi_y = (imRGB[0].shape[1] - roi_h) / 2
     imRGB = [x.astype(AL.myfloat) for x in imRGB]
-    if dark != "N" :
+    if dark != "N":
         imRGB = [x - y for x,y in zip(imRGB, darkf)]
-        #imRGB = [x.clip(0, 65535) for x in imRGB]
+        imRGB = [x.clip(0, 65535) for x in imRGB]
     for defect in defects:
         x = defect[0]
         y = defect[1]
@@ -117,12 +120,21 @@ def prepare_image(n):
         if x > 0 and x < (crop_w - 1) :
             for im in imRGB:
                 im[x,:] = (im[x-1,:] + im[x+1,:]) / 2.0
+    imRAW = imRGB[0].astype(np.uint16)
+    if im_mode == 7 or im_mode == 8 or im_mode == 16:
+        imRGB = AL.demosaic(imRAW, debayer_pattern, debayer_method)
+        imRGB = [x.astype(AL.myfloat) for x in imRGB]
     if not flat is None :
         imRGB = [x / flat for x in imRGB]
-    if im_mode == 7 or im_mode == 8:
-        imRGB = AL.demosaic(imRGB[0].astype(np.uint16), options.debayer_pattern, options.debayer_method)
-        imRGB = [x.astype(AL.myfloat) for x in imRGB]
     imRGB = [x[crop_x : (crop_x + crop_w), crop_y : (crop_y + crop_h)] for x in imRGB]
+    if im_mode == 16:
+        imSP1 = AL.demosaic(imRAW, debayer_pattern, AL.DEBAYER_SUPER_PIXEL)
+        imSP = [np.repeat(np.repeat(x, 2, axis=0), 2, axis=1) for x in imSP1]
+        imSP = [x.astype(AL.myfloat) for x in imSP]
+        if not flat is None :
+            imSP = [x / flat for x in imSP]
+        imSP = [x[crop_x : (crop_x + crop_w), crop_y : (crop_y + crop_h)] for x in imSP]
+
     if filter == 1 :
         imRGB = [scipy.signal.medfilt2d(x, kernel_size = int(filter_par)) for x in imRGB]
     elif filter == 2 :
@@ -145,7 +157,7 @@ def prepare_image(n):
         AL.save_pic(dir + "roi_area_%04d"%(no), 1, [nim])
     if method == 1 :
         nim = AL.canny(nim, sigma = 3)
-    return imRGB, nim
+    return imRGB, nim, imL, imSP
 
 def get_ref(nim):
     if method == 0 or method == 1 :
@@ -159,9 +171,9 @@ def get_ref(nim):
         ret = None
     return ref
 
-def save_image(idx, imout):
-    fname = dir + "registered_%05d"%(idx)
-    AL.save_pic(fname, im_mode, imout)
+def save_image(idx, imout, mode, prefix = ""):
+    fname = dir + prefix + "registered_%05d"%(idx)
+    AL.save_pic(fname, mode, imout)
     if save_npy != 0:
         if len(imout) == 3:
             nim = np.dstack(imout)
@@ -171,7 +183,7 @@ def save_image(idx, imout):
 
 def process_image(ii):
     (idx, n, ref) = ii
-    (imRGB, nim) = prepare_image(n)
+    (imRGB, nim, imL, imSP) = prepare_image(n)
     angle = 0
     success = 1
     if method == 0 or method == 1 :
@@ -192,13 +204,21 @@ def process_image(ii):
         yshift = 0
     print "%s: %d,%d %f %f" % (n, xshift, yshift, angle, success)
     imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
-    save_image(idx + 1, imout)
+    save_image(idx + 1, imout, im_mode)
+    if im_mode == 16:
+        imout = np.roll(np.roll(imL, xshift, axis=0), yshift, axis=1)
+        save_image(idx + 1, [imout], 1, "bw_")
+        imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imSP]
+        save_image(idx + 1, imout, 0, "sp_")
     
 
 all = AL.expand_args(args)
-base, nim = prepare_image(all[0])
+base, nim, baseL, baseSP = prepare_image(all[0])
 ref = get_ref(nim)
-save_image(0, base)
+save_image(0, base, im_mode)
+if im_mode == 16:
+    save_image(0, [baseL], 1, "bw_")
+    save_image(0, baseSP, 0, "sp_")
 todo = [(idx, im, ref) for idx, im in enumerate(all[1:])]
 
 pool = multiprocessing.Pool(cores)
