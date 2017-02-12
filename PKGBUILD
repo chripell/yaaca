@@ -1,6 +1,6 @@
 # Maintainer: Christian Pellegrin <chripell@fsfe.org>
 pkgname=yaaca
-pkgver=20170108
+pkgver=20170212
 pkgrel=1
 pkgdesc="Yet Another AstroCam Application"
 arch=('i686' 'x86_64')
