@@ -168,7 +168,7 @@ def get_ref(nim):
     elif method == 3:
         ref = nim
     else:
-        ret = None
+        ref = None
     return ref
 
 def save_image(idx, imout, mode, prefix = ""):
