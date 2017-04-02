@@ -822,7 +822,7 @@ SER_HEADER = "<14siiiiiii40s40s40sqq"
 
 class SerWriter:
 
-    def __init__(self, out_file, shape, channels, observer="", instrument="", telescope=""):
+    def __init__(self, out_file, shape, channels, observer="", instrument="", telescope="", color_id=None):
         self.out_file = out_file
         if out_file == "-":
             self.fd = sys.stdout
@@ -835,13 +835,17 @@ class SerWriter:
         self.observer = observer
         self.instrument = instrument
         self.telescope = telescope
+        self.color_id = color_id
         self.write_header()
         
     def write_header(self):
-        if self.channels == 1:
-            color_id = 0
+        if self.color_id is None:
+            if self.channels == 1:
+                color_id = 0
+            else:
+                color_id = 101
         else:
-            color_id = 101
+            color_id = self.color_id
         hdr = struct.pack(SER_HEADER,
                           "LUCAM-RECORDER",
                           0,
