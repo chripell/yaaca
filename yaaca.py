@@ -108,7 +108,7 @@ class ImageManager(object):
         x = int(self.px)
         if x < 0 or x >= self.im_width:
             x = self.im_width / 2
-        y = int(self.py)
+        y = (self.py)
         if y < 0 or y >= self.im_height:
             y = self.im_height / 2
         d = self.box_size
@@ -277,23 +277,23 @@ class ImageManager(object):
         self.disp_im = im
         self.norm_cross()
         if imtype == 1 or (imtype == 0 and auto_debayer != 0):
-            l.write('P6\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
-            l.write(im.tostring())
+            l.write(b'P6\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
+            l.write(im.tobytes())
             done = True
         elif imtype == 2 and auto_debayer != 0:
-            l.write('P6\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
+            l.write(b'P6\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
             # I have no idea why R and B are swapped :-/
-            l.write(im.view('B')[:,:,5::-2].tostring())
-            l.write(im.tostring())
+            l.write(im.view('B')[:,:,5::-2].tobytes())
+            l.write(im.tobytes())
             done = True
         elif imtype == 2 :
-            l.write('P5\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
-            l.write(im.view('B')[:,1::2].tostring())
-            l.write(im.tostring())
+            l.write(b'P5\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
+            l.write(im.view('B')[:,1::2].tobytes())
+            l.write(im.tobytes())
             done = True
         else:
-            l.write('P5\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
-            l.write(im.tostring())
+            l.write(b'P5\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
+            l.write(im.tobytes())
             done = True
         if not done:
             raise ValueError('Unsupported image format %s in numpy array' % im.dtype)
@@ -462,9 +462,9 @@ class ImageManager(object):
 
     def norm_cross(self):
         if self.px < 0 or self.px >= self.im_width:
-            self.px = self.im_width / 2
+            self.px = self.im_width // 2
         if self.py < 0 or self.py >= self.im_height:
-            self.py = self.im_height / 2
+            self.py = self.im_height // 2
         self.update_info()
         
     def set_cross(self, en):
@@ -473,10 +473,7 @@ class ImageManager(object):
 
     def set_histo(self, en):
         self.hist = en
-        if en:
-            self.histo_box.show_all()
-        else:
-            self.histo_box.hide()
+        self.histo_data = None
             
     def on_histo_press(self, w, ev):
         self.stretch_start  = ev.x
@@ -553,8 +550,8 @@ class ImageManager(object):
         self.main.queue_draw()
 
     def center_cross(self):
-        self.px = self.im_width / 2
-        self.py = self.im_height / 2
+        self.px = self.im_width // 2
+        self.py = self.im_height // 2
         self.norm_cross()
         self.main.queue_draw()
 

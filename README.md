@@ -8,13 +8,13 @@ It depends on Numeric Python and GTK3 gi interface available for
 Python2. The packages needed on Arch Linux are:
 
 ```shell
-pacman -S python2-numpy python2-gobject gtk3 gcc make libusb-1.0 python2-cairo
+pacman -S python-numpy python-gobject gtk3 gcc make libusb-1.0 python-cairo
 ```
 
 instead on Ubuntu with python2 as defult:
 
 ```shell
-apt-get install gir1.2-gtk-3.0 gcc make libusb-1.0 python-numpy python-gobject python-gi python-gi-cairo
+apt-get install gir1.2-gtk-3.0 gcc make libusb-1.0 python-numpy python-gobject python-gobject- cairo python-gi python-gi-cairo
 ```
 
 It is build around a C interface to the ZWO provided library. You can
