@@ -474,7 +474,8 @@ class ImageManager(object):
     def set_histo(self, en):
         self.hist = en
         self.histo_data = None
-            
+        self.histo.queue_draw()
+
     def on_histo_press(self, w, ev):
         self.stretch_start  = ev.x
 
