@@ -20,6 +20,7 @@ parser.add_option("--crop-h", type = "int", default = -1, help = "crop h")
 parser.add_option("--mode", type = "int", default = 3, help = "debayer mode")
 parser.add_option("--raw", action="store_true", dest="is_raw")
 parser.add_option("--register", action="store_true", dest="is_register")
+parser.add_option("--limit", type = "int", default = -1, help = "number of frames to process")
 
 (options, args) = parser.parse_args()
 
@@ -28,36 +29,44 @@ crop_y = options.crop_y
 crop_w = options.crop_w
 crop_h = options.crop_h
 out_file = options.out
+limit = options.limit
 
 ser_out = None
 ref = None
 
-for fname in args:
-    ser = AL.SerReader(fname, options.is_raw, options.mode)
-    for i in xrange(ser.count):
-        im = ser.get()
-        if crop_w < 0:
-            crop_w = im[0].shape[0]
-        if crop_h < 0:
-            crop_h = im[0].shape[1]
-        if ser_out is None:
-            if options.is_raw:
-                color_id = ser.color_id
-            else:
-                color_id = None
-            ser_out = AL.SerWriter(out_file, (crop_w, crop_h) , len(im), color_id=color_id)
-        if options.is_register:
-            if len(im) == 1 :
-                imL = im[0]
-            else:
-                imL = 0.299 * im[0] + 0.587 * im[1] + 0.114 * im[2]
-            if ref is None:
-                ref = np.fft.fft2(imL)
-            else:
-                fft = np.fft.fft2(imL,s=ref.shape)
-                xshift,yshift = AL.registration_dft(ref, fft)
-                im = [np.roll(np.roll(i, xshift, axis=0), yshift, axis=1) for i in im]
-        im =  [i[crop_x:(crop_x+crop_w),crop_y:(crop_y+crop_h)] for i in im]
-        ser_out.write_frame(im)
+def process():
+  global ser_out, ref, crop_x, crop_y, crop_w, crop_h, out_file, limit
+  n_done = 0
+  for fname in args:
+      ser = AL.SerReader(fname, options.is_raw, options.mode)
+      for i in xrange(ser.count):
+          if limit > 0 and n_done >= limit:
+              return
+          im = ser.get()
+          if crop_w < 0:
+              crop_w = im[0].shape[0]
+          if crop_h < 0:
+              crop_h = im[0].shape[1]
+          if ser_out is None:
+              if options.is_raw:
+                  color_id = ser.color_id
+              else:
+                  color_id = None
+              ser_out = AL.SerWriter(out_file, (crop_w, crop_h) , len(im), color_id=color_id)
+          if options.is_register:
+              if len(im) == 1 :
+                  imL = im[0]
+              else:
+                  imL = 0.299 * im[0] + 0.587 * im[1] + 0.114 * im[2]
+              if ref is None:
+                  ref = np.fft.fft2(imL)
+              else:
+                  fft = np.fft.fft2(imL,s=ref.shape)
+                  xshift,yshift = AL.registration_dft(ref, fft)
+                  im = [np.roll(np.roll(i, xshift, axis=0), yshift, axis=1) for i in im]
+          im =  [i[crop_x:(crop_x+crop_w),crop_y:(crop_y+crop_h)] for i in im]
+          ser_out.write_frame(im)
+          n_done = n_done + 1
 
+process()
 ser_out.close()

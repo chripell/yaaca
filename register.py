@@ -154,7 +154,7 @@ def prepare_image(n):
     elif filter == 102 :
         nim = AL.waveletDenoise(nim, filter_par)
     if debug :
-        AL.save_pic(dir + "roi_area_%04d"%(no), 1, [nim])
+        AL.save_pic(dir + "roi_area_%s"%(os.path.basename(n)), 1, [nim])
     if method == 1 :
         nim = AL.canny(nim, sigma = 3)
     return imRGB, nim, imL, imSP
