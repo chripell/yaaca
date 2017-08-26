@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 import sys
 import os
@@ -9,10 +9,10 @@ import ASI
 import time
 import scipy.misc
 
-print(ASI.list())
+print((ASI.list()))
 
 c = ASI.Camera(0)
-print(c.prop())
+print((c.prop()))
 c.set({'width': 640, 'height': 480, 'start_x': 320, 'start_y': 240})
 s = c.stat()
 assert s['width'] == 640
@@ -22,12 +22,12 @@ assert s['start_y'] == 240
 # Only for color ones 1:
 c.set({'type': 1})
 c.start()
-print(c.stat())
-for i in xrange(5):
+print((c.stat()))
+for i in range(5):
     time.sleep(0.5)
     s = c.stat()
     im = c.get_image()
-    print s['captured'], s['vals'][7]/10.0, s['width'], s['height'], s['type'], im.shape
+    print(s['captured'], s['vals'][7]/10.0, s['width'], s['height'], s['type'], im.shape)
     c.set({'start_x': 320 - 20 * (i + 1)})
     scipy.misc.imsave('/tmp/yaaca_test_%d.jpg' % i, im)
 s = c.stat()

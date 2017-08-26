@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 # register.py
 # outputs: [x] [y] offset for every image
@@ -202,7 +202,7 @@ def process_image(ii):
     else:
         xshift = 0
         yshift = 0
-    print "%s: %d,%d %f %f" % (n, xshift, yshift, angle, success)
+    print(("%s: %d,%d %f %f" % (n, xshift, yshift, angle, success)))
     imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
     save_image(idx + 1, imout, im_mode)
     if im_mode == 16:

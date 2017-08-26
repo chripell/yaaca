@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 import sys
 import os
@@ -21,7 +21,7 @@ parser.add_option("--mono", action="store_true", dest="is_mono")
 
 ser = AL.SerReader(args[0], options.is_raw, options.mode)
 
-for i in xrange(ser.count):
+for i in range(ser.count):
     im = ser.get()
     if len(im) == 3 and options.is_mono:
         imRGB = [x.astype(float) for x in im]

@@ -12,17 +12,17 @@ try:
     from scipy.ndimage import (
         gaussian_filter, generate_binary_structure, binary_erosion, label)
 except ImportError:
-    print "Cannot import scipy libraries"
+    print("Cannot import scipy libraries")
 
 try:
     import cv2
 except ImportError:
-    print "Cannot import OpenCV"
+    print("Cannot import OpenCV")
     
 try:
     import pywt
 except ImportError:
-    print "Cannot import wavelet libraries"
+    print("Cannot import wavelet libraries")
 
 myfloat = np.float32
 gamma = 1.0 / 2.2
@@ -96,7 +96,7 @@ def waveletDenoise(u,noiseSigma):
     levels  = int( np.log2(u.shape[0]) )
     waveletCoeffs = pywt.wavedec2( u, wavelet, level=levels)
     threshold=noiseSigma*np.sqrt(2*np.log2(u.size))
-    NWC = map(lambda x: pywt.thresholding.soft(x,threshold), waveletCoeffs)
+    NWC = [pywt.thresholding.soft(x,threshold) for x in waveletCoeffs]
     u = pywt.waverec2( NWC, wavelet)[:u.shape[0],:u.shape[1]]
     return u
 
@@ -444,7 +444,7 @@ def geometric_median(nim,threshold=None,tolerance=0.1,iterations=10):
     if threshold==None:
         threshold=np.min(nim)
     msk = nim>threshold
-    xx,yy = np.meshgrid(xrange(nim.shape[1]),xrange(nim.shape[0]))
+    xx,yy = np.meshgrid(range(nim.shape[1]),range(nim.shape[0]))
 
     gmx,gmy=np.mean(xx[msk]), np.mean(yy[msk])
     for i in range(iterations):
@@ -471,10 +471,10 @@ def towav(nim, levels, wavelet):
     coeffs = pywt.wavedec2(nim,wavelet,level=levels)
     cA = coeffs[0]
     nim = cA.flatten()
-    cH = [ coeffs[l+1][0] for l in xrange(levels) ]
-    cV = [ coeffs[l+1][1] for l in xrange(levels) ]
-    cD = [ coeffs[l+1][2] for l in xrange(levels) ]
-    for l in xrange(levels):
+    cH = [ coeffs[l+1][0] for l in range(levels) ]
+    cV = [ coeffs[l+1][1] for l in range(levels) ]
+    cD = [ coeffs[l+1][2] for l in range(levels) ]
+    for l in range(levels):
         nim = np.append(nim, cH[l].flatten())
         nim = np.append(nim, cV[l].flatten())
         nim = np.append(nim, cD[l].flatten())
@@ -484,7 +484,7 @@ def fromwav(stack, coeffs, cA, cH, cV, cD, levels, wavelet):
     i1 = len(cA.flatten())
     cA = stack[:i1].reshape(cA.shape)
     coeffs = [cA]
-    for l in xrange(levels):
+    for l in range(levels):
         i2 = i1 + len(cH[l].flatten())
         i3 = i2 + len(cV[l].flatten())
         i4 = i3 + len(cD[l].flatten())
@@ -502,7 +502,7 @@ def rank(method, stack, width, height, par):
     else:
         ox,oy = width/2., height/2.
         rmax = np.sqrt(ox**2 + oy**2)
-        xx,yy = np.meshgrid(xrange(width),xrange(height))
+        xx,yy = np.meshgrid(range(width),range(height))
         w = np.sqrt((xx-ox)**2 + (yy-oy)**2) / rmax
         wmid  = par["spectralMidFrequency"]
         pmid  = par["spectralMidRank"]
@@ -583,7 +583,7 @@ def load_stack(im_list, n, dataMode, im_mode, group, ch, x, y, w, h):
     height = 0
     stack = []
     imw = []
-    for xxx in xrange(n):
+    for xxx in range(n):
         #print "step ", xxx, "/", n - 1, " group ", group,  " loading ", im_list[xxx]
         im = load_pic(im_list[xxx], im_mode)[ch][x:(x+w),y:(y+h)]
         im = im.astype(myfloat)
@@ -697,8 +697,8 @@ def expand_args(args):
             r.append(i)
     return r
 
-(DEBAYER_NONE, DEBAYER_BGGR, DEBAYER_GRBG) = range(3)
-(DEBAYER_VECTOR_MEDIAN, DEBAYER_VECTOR_MEAN, DEBAYER_SUPER_PIXEL, DEBAYER_OPENCV1) = range(4)
+(DEBAYER_NONE, DEBAYER_BGGR, DEBAYER_GRBG) = list(range(3))
+(DEBAYER_VECTOR_MEDIAN, DEBAYER_VECTOR_MEAN, DEBAYER_SUPER_PIXEL, DEBAYER_OPENCV1) = list(range(4))
 
 def demosaic(nim,pattern,method=DEBAYER_OPENCV1):
     if method <= DEBAYER_VECTOR_MEAN:

@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 # stack.py
 #
@@ -20,7 +20,7 @@ import astrolib as AL
 try:
     import pywt
 except ImportError:
-    print "Cannot import wavelet libraries"
+    print("Cannot import wavelet libraries")
 from optparse import OptionParser
 
 parser = OptionParser(usage = "usage: %prog [opts] [files or @file_list ...]")
@@ -61,7 +61,7 @@ ys = [i*ch for i in range(chunks)]
 
 def do_chunk(chunk):
     (frame0, frame1, x, y, cw, cy, channel, group) = chunk
-    print "chunk %d-%d,%d-%d,%d"%(x,x+cw,y,y+ch,channel)
+    print("chunk %d-%d,%d-%d,%d"%(x,x+cw,y,y+ch,channel))
     (stack, width, height, imw) = AL.load_stack(
         all_frames[frame0:], frame1 - frame0, dataMode, im_mode, group, channel,
         x, y, cw, ch)
@@ -73,7 +73,7 @@ def get_empty():
 
 pool = multiprocessing.Pool(cores)
 
-for group in xrange(noOfGroups):
+for group in range(noOfGroups):
     frame0 = group*g
     frame1 = min(noOfFrames,frame0+g)
     todo = []

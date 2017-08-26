@@ -1,4 +1,4 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 
 import sys
 import os
@@ -9,7 +9,7 @@ import ASI
 try:
     import astrolib as AL
 except ImportError:
-    print "Cannot import astrolove, SAA won't work"
+    print("Cannot import astrolove, SAA won't work")
 
 import json
 import numpy as np
@@ -516,7 +516,7 @@ class ImageManager(object):
             cr.new_path()
             cr.move_to(0, height - 0)
             cr.line_to(0, height - self.histo_data[0] * yscale)
-            for i in xrange(1, 128):
+            for i in range(1, 128):
                 cr.line_to(i * xscale, height - self.histo_data[i] * yscale)
             cr.line_to(width, height - 0)
             cr.close_path()
@@ -651,7 +651,7 @@ class CamManager(object):
         a[1] = False
         v[1] = 1000000
         if "ASI1600" in self.parameters()['Name']:
-            print "Fixing USB bandwidth to 95%"
+            print("Fixing USB bandwidth to 95%")
             a[6] = False
             v[6] = 95
         if "ASI120M" in self.parameters()['Name']:
@@ -875,7 +875,7 @@ class CamSim(object):
     def get_image(self):
         if not self.running:
             return False
-        print "%d/%d" % (self.i, self.ser.count)
+        print("%d/%d" % (self.i, self.ser.count))
         im = self.ser.get()
         im.reverse()
         im = [i.transpose() for i in im]
@@ -1008,7 +1008,7 @@ class ROIDialog(Gtk.Dialog, DialogMixin):
         button_grid.set_row_homogeneous(True)
         button_grid.set_column_homogeneous(True)
         self._grid.attach(button_grid, 0, 7, 2, 2)
-        for i in xrange(8):
+        for i in range(8):
             bi = (i // 4) + 1
             pa = 4 - (i % 4)
             bwidth = self._par["MaxWidth"] / bi

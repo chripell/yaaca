@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 
 import sys
 import os
@@ -39,7 +39,7 @@ def process():
   n_done = 0
   for fname in args:
       ser = AL.SerReader(fname, options.is_raw, options.mode)
-      for i in xrange(ser.count):
+      for i in range(ser.count):
           if limit > 0 and n_done >= limit:
               return
           im = ser.get()

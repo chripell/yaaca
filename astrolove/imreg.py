@@ -35,7 +35,7 @@
 FFT based image registration. --- main functions
 """
 
-from __future__ import division, print_function
+
 
 import math
 
@@ -46,7 +46,7 @@ except ImportError:
     import numpy.fft as fft
 import scipy.ndimage.interpolation as ndii
 
-import utils
+from . import utils
 
 
 def _logpolar_filter(shape):
