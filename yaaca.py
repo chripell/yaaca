@@ -24,23 +24,24 @@ from gi.repository import Gtk, GdkPixbuf, GLib, Gdk, Gio, GObject
 
 
 class ImageManager(object):
-    
+
     def __init__(self):
         self.main = Gtk.DrawingArea()
         self.main.connect("draw", self.main_draw)
         self.main.connect("configure-event", self.main_configure)
-        self.main.add_events(Gdk.EventMask.BUTTON_PRESS_MASK) 
+        self.main.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
         self.main.connect('button-press-event', self.on_main_button_press)
-        
+
         self.small = Gtk.DrawingArea()
         self.small.connect("draw", self.small_draw)
-        self.small.add_events(Gdk.EventMask.BUTTON_PRESS_MASK) 
+        self.small.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
         self.small.connect('button-press-event', self.on_small_button_press)
 
         self.histo_box = Gtk.VBox()
         self.histo = Gtk.DrawingArea()
         self.histo.connect("draw", self.histo_draw)
-        self.histo.add_events(Gdk.EventMask.BUTTON_PRESS_MASK | Gdk.EventMask.BUTTON_RELEASE_MASK) 
+        self.histo.add_events(Gdk.EventMask.BUTTON_PRESS_MASK |
+                              Gdk.EventMask.BUTTON_RELEASE_MASK)
         self.histo.connect("button-press-event", self.on_histo_press)
         self.histo.connect("button-release-event", self.on_histo_release)
         self.histo.set_property("height-request", 200)
@@ -52,7 +53,7 @@ class ImageManager(object):
         self.info_box = Gtk.Label()
         self.info_box.set_justify(Gtk.Justification.CENTER)
         self.info_box.set_markup("Not started")
-        
+
         self.zoom = 1.0
         self.small_x = 0
         self.small_y = 0
@@ -85,14 +86,17 @@ class ImageManager(object):
 
     def update_info(self):
         s = "<b>%d</b>,<b>%d</b> box(b,n) <b>%d</b>\nstretch: <b>%d-%d</b>" % (
-            self.px, self.py, self.box_size, self.stretch_from, self.stretch_to)
-        if not self.disp_im is None:
+            self.px, self.py,
+            self.box_size, self.stretch_from, self.stretch_to)
+        if self.disp_im is not None:
             if len(self.disp_im.shape) == 3:
-                s = s + "\nV: %d, %d, %d" % (int(self.disp_im[self.py,self.px,0]),
-                                                 int(self.disp_im[self.py,self.px,1]),
-                                                 int(self.disp_im[self.py,self.px,2]))
+                s = s + "\nV: %d, %d, %d" % (
+                    int(self.disp_im[self.py, self.px, 0]),
+                    int(self.disp_im[self.py, self.px, 1]),
+                    int(self.disp_im[self.py, self.px, 2]))
             else:
-                s = s + "\nValue: %d" % int(self.disp_im[self.py,self.px])
+                s = s + "\nValue: %d" % int(
+                    self.disp_im[self.py, self.px])
         if self.do_saa:
             s += "\nSAA off: %d,%d" % (self.xshift, self.yshift)
         if self.show_fst:
@@ -132,54 +136,56 @@ class ImageManager(object):
             y1 = self.im_height
         return x0, x1, y0, y1
 
-    def set_saa(self,v):
+    def set_saa(self, v):
         self.do_saa = v
-        
-    def show_saa_dark(self,v):
+
+    def show_saa_dark(self, v):
         self.show_raw = not v
         self.new_image()
-        
-    def show_fast(self,v):
+
+    def show_fast(self, v):
         self.show_fst = v
         self.new_image()
-        
-    def do_add_dark(self,v):
+
+    def do_add_dark(self, v):
         self.add_dark = v
 
-    def do_gamma_stretch(self,v):
+    def do_gamma_stretch(self, v):
         self.gamma_stretch = v
 
     def reset_dark(self):
         self.ndark = 0
         self.add_dark = False
-        
+
     def reset_saa(self):
         self.nlight = 0
         self.do_saa = False
-        
+
     def process_image(self):
         done = False
         if self.imtype == 1 or (self.imtype == 0 and self.auto_debayer != 0):
-            imR = self.im[:,:,0]
-            imG = self.im[:,:,1]
-            imB = self.im[:,:,2]
+            imR = self.im[:, :, 0]
+            imG = self.im[:, :, 1]
+            imB = self.im[:, :, 2]
             imL = 0.299 * imR + 0.587 * imG + 0.114 * imB
             done = True
         elif self.imtype == 2 and self.auto_debayer != 0:
             # I have no idea why R and B are swapped :-/
-            imR = self.im[:,:,2]
-            imG = self.im[:,:,1]
-            imB = self.im[:,:,0]
-            imL = 0.299 / 257.0 * imR + 0.587 / 257.0 * imG + 0.114 / 257.0 * imB
+            imR = self.im[:, :, 2]
+            imG = self.im[:, :, 1]
+            imB = self.im[:, :, 0]
+            imL = (0.299 / 257.0 * imR +
+                   0.587 / 257.0 * imG + 0.114 / 257.0 * imB)
             done = True
-        elif self.imtype == 2 :
+        elif self.imtype == 2:
             imL = self.im / 257.0
             done = True
         else:
             imL = self.im
             done = True
         if not done:
-            raise ValueError('Unsupported image format %s in numpy array' % im.dtype)
+            raise ValueError(
+                'Unsupported image format %s in numpy array' % self.im.dtype)
 
         if self.hist:
             if self.box_size > 1:
@@ -192,16 +198,16 @@ class ImageManager(object):
             self.histo_data = np.histogram(imH, bins=self.bins)[0]
         else:
             self.histo_data = None
-        
+
         if self.imtype == 1 or (self.imtype == 0 and self.auto_debayer != 0):
             im = self.im
             imt = 1
             adb = 1
         elif self.imtype == 2 and self.auto_debayer != 0:
-            im = self.im[:,:,2::-1] / 257.0
+            im = self.im[:, :, 2::-1] / 257.0
             imt = 1
             adb = 1
-        elif self.imtype == 2 :
+        elif self.imtype == 2:
             im = imL
             imt = 3
             adb = 0
@@ -209,7 +215,7 @@ class ImageManager(object):
             im = self.im
             imt = 3
             adb = 0
-                
+
         if self.add_dark:
             if self.ndark == 0:
                 self.dark = im.astype(np.float)
@@ -217,21 +223,25 @@ class ImageManager(object):
             else:
                 self.dark += im
                 self.ndark += 1
-                
+
         if self.do_saa:
             if self.nlight == 0:
                 self.fft_box = self.get_box()
-                nim = imL[self.fft_box[2]:self.fft_box[3], self.fft_box[0]:self.fft_box[1]]
+                nim = imL[self.fft_box[2]:self.fft_box[3],
+                          self.fft_box[0]:self.fft_box[1]]
                 self.fft_ref = np.fft.fft2(nim)
                 self.light = im.astype(np.float)
                 self.nlight = 1
             else:
-                nim = imL[self.fft_box[2]:self.fft_box[3], self.fft_box[0]:self.fft_box[1]]
+                nim = imL[self.fft_box[2]:self.fft_box[3],
+                          self.fft_box[0]:self.fft_box[1]]
                 fft = np.fft.fft2(nim, s=self.fft_ref.shape)
-                self.xshift, self.yshift = AL.registration_dft(self.fft_ref, fft)
-                self.light += np.roll(np.roll(im, self.xshift, axis=0), self.yshift, axis=1)
+                self.xshift, self.yshift = AL.registration_dft(
+                    self.fft_ref, fft)
+                self.light += np.roll(
+                    np.roll(im, self.xshift, axis=0), self.yshift, axis=1)
                 self.nlight += 1
-                
+
         self.current = (im, imt, adb)
         return self.redraw_image()
 
@@ -246,13 +256,15 @@ class ImageManager(object):
             im = AL.gamma_stretch([im], mv=255.0)[0]
         if self.stretch_from > 0 or self.stretch_to < 255:
             scale = 255.0 / (self.stretch_to - self.stretch_from)
-            im = (np.clip(im, self.stretch_from, self.stretch_to) - self.stretch_from) * scale
+            im = (np.clip(im, self.stretch_from, self.stretch_to)
+                  - self.stretch_from) * scale
         return im.astype(np.uint8), self.current[1], self.current[2]
-    
-    def new_image(self, nim = None, nimtype = None, nauto_debayer = None):
-        if nim is not None and nimtype is not None and nauto_debayer is not None:
-            if ((nauto_debayer == 2 and nimtype == 0) or
-                (nauto_debayer == 2 and nimtype == 2)):
+
+    def new_image(self, nim=None, nimtype=None, nauto_debayer=None):
+        if nim is not None and (nimtype is not None and
+                                nauto_debayer is not None):
+            if ((nauto_debayer == 2
+                 and nimtype == 0) or (nauto_debayer == 2 and nimtype == 2)):
                 (h, w, c) = nim.shape
                 self.im = nim.reshape(2*h, w/2, c)[:h/2, :, :]
             else:
@@ -277,39 +289,41 @@ class ImageManager(object):
         self.disp_im = im
         self.norm_cross()
         if imtype == 1 or (imtype == 0 and auto_debayer != 0):
-            l.write(b'P6\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
+            l.write(b'P6\n%d %d\n255\n' % (im.shape[1], im.shape[0]))
             l.write(im.tobytes())
             done = True
         elif imtype == 2 and auto_debayer != 0:
-            l.write(b'P6\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
+            l.write(b'P6\n%d %d\n255\n' % (im.shape[1], im.shape[0]))
             # I have no idea why R and B are swapped :-/
-            l.write(im.view('B')[:,:,5::-2].tobytes())
+            l.write(im.view('B')[:, :, 5::-2].tobytes())
             l.write(im.tobytes())
             done = True
-        elif imtype == 2 :
-            l.write(b'P5\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
-            l.write(im.view('B')[:,1::2].tobytes())
+        elif imtype == 2:
+            l.write(b'P5\n%d %d\n255\n' % (im.shape[1], im.shape[0]))
+            l.write(im.view('B')[:, 1::2].tobytes())
             l.write(im.tobytes())
             done = True
         else:
-            l.write(b'P5\n%d %d\n255\n'%(im.shape[1], im.shape[0]))
+            l.write(b'P5\n%d %d\n255\n' % (im.shape[1], im.shape[0]))
             l.write(im.tobytes())
             done = True
         if not done:
-            raise ValueError('Unsupported image format %s in numpy array' % im.dtype)
+            raise ValueError(
+                'Unsupported image format %s in numpy array' % im.dtype)
         l.close()
         self.pb = l.get_pixbuf()
-        
+
         new_small_width = self.small.get_allocated_width()
         old_small_height = self.small.get_allocated_height()
-        new_small_height = int(float(self.im_height) / self.im_width * new_small_width)
+        new_small_height = int(float(self.im_height) /
+                               self.im_width * new_small_width)
         if new_small_height != old_small_height:
             self.small.set_size_request(new_small_width, new_small_height)
         self.small_width = new_small_width
         self.small_height = new_small_height
 
         self.calc()
-            
+
         self.main.queue_draw()
         self.small.queue_draw()
         if self.hist or self.stretch_from > 0 or self.stretch_to < 255:
@@ -317,43 +331,46 @@ class ImageManager(object):
 
     def calc(self):
         if self.pb:
-          real_width = self.im_width * self.zoom
-          real_height = self.im_height * self.zoom
-          main_width = self.main.get_allocated_width()
-          main_height = self.main.get_allocated_height()
+            real_width = self.im_width * self.zoom
+            real_height = self.im_height * self.zoom
+            main_width = self.main.get_allocated_width()
+            main_height = self.main.get_allocated_height()
 
-          self.view_width = float(main_width) / real_width * self.small_width
-          if self.view_width > self.small_width - 1:
-              self.view_width = self.small_width - 1
-          self.view_height = float(main_height) / real_height * self.small_height
-          if self.view_height > self.small_height - 1:
-              self.view_height = self.small_height - 1
-        
-          self.view_off_x = int(self.small_x - self.view_width / 2)
-          if self.view_off_x < 0:
-              self.view_off_x = 0
-          if self.view_off_x + self.view_width > self.small_width - 1:
-              self.view_off_x = self.small_width - 1 - self.view_width
-            
-          self.view_off_y = int(self.small_y - self.view_height / 2)
-          if self.view_off_y < 0:
-              self.view_off_y = 0
-          if self.view_off_y + self.view_height > self.small_height - 1:
-              self.view_off_y = self.small_height - 1 - self.view_height
+            self.view_width = float(main_width) / real_width * self.small_width
+            if self.view_width > self.small_width - 1:
+                self.view_width = self.small_width - 1
+            self.view_height = (float(main_height) /
+                                real_height * self.small_height)
+            if self.view_height > self.small_height - 1:
+                self.view_height = self.small_height - 1
 
-          if self.small_width == 0 or self.small_height == 0:
-              return
-          self.off_x = int(float(self.view_off_x) / self.small_width * real_width)
-          self.off_y = int(float(self.view_off_y) / self.small_height * real_height)
+            self.view_off_x = int(self.small_x - self.view_width / 2)
+            if self.view_off_x < 0:
+                self.view_off_x = 0
+            if self.view_off_x + self.view_width > self.small_width - 1:
+                self.view_off_x = self.small_width - 1 - self.view_width
+
+            self.view_off_y = int(self.small_y - self.view_height / 2)
+            if self.view_off_y < 0:
+                self.view_off_y = 0
+            if self.view_off_y + self.view_height > self.small_height - 1:
+                self.view_off_y = self.small_height - 1 - self.view_height
+
+            if self.small_width == 0 or self.small_height == 0:
+                return
+            self.off_x = int(float(self.view_off_x) /
+                             self.small_width * real_width)
+            self.off_y = int(float(self.view_off_y) /
+                             self.small_height * real_height)
 
     def centered_text(self, wi, cr, sz, txt):
         w = wi.get_allocated_width()
         h = wi.get_allocated_height()
         cr.set_font_size(sz)
         (x, y, width, height, dx, dy) = cr.text_extents(txt)
-        cr.move_to(w/2 - width/2, h/2)    
+        cr.move_to(w/2 - width/2, h/2)
         cr.show_text(txt)
-        
+
     def main_draw(self, w, cr):
         if not self.pb:
             self.centered_text(w, cr, 40, "Open a Camera!")
@@ -378,28 +395,33 @@ class ImageManager(object):
         if self.cross:
             cr.set_source_rgb(0.80, 0, 0)
             cr.set_line_width(1)
-            (x,y) = self.from_real(self.px, self.py)
+            (x, y) = self.from_real(self.px, self.py)
             cr.move_to(0, y)
             cr.line_to(self.main.get_allocated_width(), y)
             cr.move_to(x, 0)
             cr.line_to(x, self.main.get_allocated_height())
             cr.stroke()
             if self.box_size > 1:
-                (x,y) = self.from_real(self.px - self.box_size, self.py - self.box_size)
+                (x,y) = self.from_real(self.px - self.box_size,
+                                       self.py - self.box_size)
                 cr.move_to(x, y)
-                (x,y) = self.from_real(self.px + self.box_size, self.py - self.box_size)
+                (x,y) = self.from_real(self.px + self.box_size,
+                                       self.py - self.box_size)
                 cr.line_to(x, y)
-                (x,y) = self.from_real(self.px + self.box_size, self.py + self.box_size)
+                (x,y) = self.from_real(self.px + self.box_size,
+                                       self.py + self.box_size)
                 cr.line_to(x, y)
-                (x,y) = self.from_real(self.px - self.box_size, self.py + self.box_size)
+                (x,y) = self.from_real(self.px - self.box_size,
+                                       self.py + self.box_size)
                 cr.line_to(x, y)
-                (x,y) = self.from_real(self.px - self.box_size, self.py - self.box_size)
+                (x,y) = self.from_real(self.px - self.box_size,
+                                       self.py - self.box_size)
                 cr.line_to(x, y)
                 cr.stroke()
 
     def to_real(self, x, y):
         return ((x + self.off_x) / self.zoom,
-                    (y + self.off_y) / self.zoom)
+                (y + self.off_y) / self.zoom)
 
     def from_real(self, x, y):
         if self.zoom == 1.0:
@@ -408,8 +430,8 @@ class ImageManager(object):
         else:
             off_x = self.off_x / self.zoom
             off_y = self.off_y / self.zoom
-        return ((x  - off_x) * self.zoom,
-                    (y  - off_y) * self.zoom)
+        return ((x - off_x) * self.zoom,
+                (y - off_y) * self.zoom)
 
     def on_main_button_press(self, w, ev):
         (self.px, self.py) = self.to_real(ev.x, ev.y)
@@ -417,18 +439,21 @@ class ImageManager(object):
         self.py = int(self.py)
         self.norm_cross()
         self.main.queue_draw()
-        
+
     def small_draw(self, w, cr):
         if not self.pb:
             self.centered_text(w, cr, 10, "Open a Camera!")
             return
         width = w.get_allocated_width()
         height = w.get_allocated_height()
-        Gdk.cairo_set_source_pixbuf(cr, self.pb.scale_simple(width, height, GdkPixbuf.InterpType.BILINEAR), 0, 0)
+        Gdk.cairo_set_source_pixbuf(
+            cr, self.pb.scale_simple(
+                width, height, GdkPixbuf.InterpType.BILINEAR), 0, 0)
         cr.paint()
         cr.set_source_rgb(0.42, 0.65, 0.80)
         cr.set_line_width(2)
-        cr.rectangle (self.view_off_x, self.view_off_y, self.view_width, self.view_height)
+        cr.rectangle(self.view_off_x, self.view_off_y,
+                     self.view_width, self.view_height)
         cr.stroke()
         if self.cross:
             cr.set_source_rgb(0.80, 0, 0)
@@ -447,7 +472,7 @@ class ImageManager(object):
         self.calc()
         self.main.queue_draw()
         self.small.queue_draw()
-            
+
     def main_configure(self, w, ev):
         if self.pb:
             self.calc()
@@ -466,7 +491,7 @@ class ImageManager(object):
         if self.py < 0 or self.py >= self.im_height:
             self.py = self.im_height // 2
         self.update_info()
-        
+
     def set_cross(self, en):
         self.cross = en
         self.norm_cross()
@@ -477,7 +502,7 @@ class ImageManager(object):
         self.histo.queue_draw()
 
     def on_histo_press(self, w, ev):
-        self.stretch_start  = ev.x
+        self.stretch_start = ev.x
 
     def on_histo_release(self, w, ev):
         if abs(ev.x - self.stretch_start) > 10:
@@ -505,7 +530,8 @@ class ImageManager(object):
         cr.stroke()
         if self.stretch_from >= 0:
             cr.set_source_rgb(0.9, 0.6, 0.6)
-            cr.rectangle(self.stretch_from, 0, self.stretch_to - self.stretch_from, height)
+            cr.rectangle(self.stretch_from, 0,
+                         self.stretch_to - self.stretch_from, height)
             cr.fill()
         cr.set_source_rgb(0.1, 0.1, 0.1)
         if self.histo_data is not None:
@@ -592,12 +618,12 @@ class CamManager(object):
         l.set_markup(txt)
         box.pack_start(l, False, False, 0)
         return l
-        
+
     def open(self, idx):
         try:
             self.camera = ASI.Camera(idx)
             self.idx = idx
-            for i,v in enumerate(self.prop()["controls"]):
+            for i, v in enumerate(self.prop()["controls"]):
                 if "ensor temperature" in v["Description"]:
                     self.temp_idx = i
                 if "Exposure Time" in v["Description"]:
@@ -610,7 +636,7 @@ class CamManager(object):
         if self.camera:
             self.camera.close()
             self.camera = None
-        
+
     def start(self):
         if not self.running and self.camera and not self.error:
             self.running = True
@@ -639,7 +665,7 @@ class CamManager(object):
         except IOError as e:
             return str(e)
         return None
-            
+
     def auto_exposure(self):
         s = self.camera.stat()
         a = s['auto']
@@ -654,7 +680,7 @@ class CamManager(object):
             v[6] = 95
         if "ASI120M" in self.parameters()['Name']:
             t = 0
-        self.camera.set({'auto' : a, 'vals': v, 'type': t})
+        self.camera.set({'auto': a, 'vals': v, 'type': t})
 
     def us2s(self, us):
         if us < 1000:
@@ -668,7 +694,7 @@ class CamManager(object):
         now = time.time()
         count = s["captured"]
         if self.last_count < 0:
-            self.last_count = count 
+            self.last_count = count
             self.last_tick = now
         else:
             if ((now - self.last_tick > 1.0) and
@@ -677,19 +703,24 @@ class CamManager(object):
                 self.last_count = count
                 self.last_tick = now
         return "%.2f" % self.fps
-        
+
     def update_sbox(self, s):
-        self.ltemp.set_markup("Temp: <b>%.1f</b>" % (s["vals"][self.temp_idx] / 10.0))
-        self.lexposure.set_markup("Exp (o-p,k-l): <b>%s</b>" % self.us2s(s["vals"][1]))
-        self.lgain.set_markup("Gain (q-a,w-s): <b>%d</b>" % s["vals"][0])
+        self.ltemp.set_markup("Temp: <b>%.1f</b>" % (
+            s["vals"][self.temp_idx] / 10.0))
+        self.lexposure.set_markup(
+            "Exp (o-p,k-l): <b>%s</b>" % self.us2s(s["vals"][1]))
+        self.lgain.set_markup(
+            "Gain (q-a,w-s): <b>%d</b>" % s["vals"][0])
         if s["recording"]:
             self.lrecording.set_markup("Recording (r): <b>YES</b>")
         else:
             self.lrecording.set_markup("Recording (r): <b>NO</b>")
-        self.ldropped.set_markup("Dropped: <b>%d / %d</b>" %(s["cam_dropped"], s["dropped"]))
-        self.lcapfail.set_markup("Cap/Fail: <b>%d / %d</b>" %(s["captured"], s["failed"]))
+        self.ldropped.set_markup("Dropped: <b>%d / %d</b>" % (
+            s["cam_dropped"], s["dropped"]))
+        self.lcapfail.set_markup("Cap/Fail: <b>%d / %d</b>" % (
+            s["captured"], s["failed"]))
         self.lFPS.set_markup("FPS: %s" % self.calc_fps(s))
-        
+
     def get_image(self):
         if not self.periodic:
             return False
@@ -714,7 +745,7 @@ class CamManager(object):
 
     def parameters(self):
         return self.asi_list[self.idx]
-    
+
     def hook(self, exp):
         if not self.periodic and self.running and not self.error:
             # To ms, exp is in us
@@ -730,7 +761,7 @@ class CamManager(object):
         if self.periodic:
             GLib.source_remove(self.periodic)
             self.periodic = None
-            
+
     def run(self, idx):
         self.stop()
         self.close()
@@ -758,27 +789,28 @@ class CamManager(object):
 
     def error_dialog(self, w, e):
         dialog = Gtk.MessageDialog(w, 0, Gtk.MessageType.ERROR,
-            Gtk.ButtonsType.OK, e)
+                                   Gtk.ButtonsType.OK, e)
         dialog.run()
         dialog.destroy()
 
     def save_parameters(self, w):
-        dialog = Gtk.FileChooserDialog("Save parameters", w,
-                                        Gtk.FileChooserAction.SAVE,
-                                        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                                         Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT))
+        dialog = Gtk.FileChooserDialog(
+            "Save parameters", w, Gtk.FileChooserAction.SAVE,
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+             Gtk.STOCK_SAVE, Gtk.ResponseType.ACCEPT))
         dialog.set_current_name("default.yaaca")
         response = dialog.run()
         if response == Gtk.ResponseType.ACCEPT:
             with open(dialog.get_filename(), "w") as f:
-                json.dump(self.get(), f, sort_keys=True, indent=4, separators=(',', ': '))
+                json.dump(self.get(), f, sort_keys=True, indent=4,
+                          separators=(',', ': '))
         dialog.destroy()
-        
+
     def load_parameters(self, w):
-        dialog = Gtk.FileChooserDialog("Load parameters", w,
-                                        Gtk.FileChooserAction.OPEN,
-                                        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                                         Gtk.STOCK_OPEN, Gtk.ResponseType.ACCEPT))
+        dialog = Gtk.FileChooserDialog(
+            "Load parameters", w, Gtk.FileChooserAction.OPEN,
+            (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+             Gtk.STOCK_OPEN, Gtk.ResponseType.ACCEPT))
         err = None
         response = dialog.run()
         try:
@@ -795,18 +827,18 @@ class CamManager(object):
         dialog.destroy()
         if err:
             self.error_dialog(w, err)
-            
+
 
 class Choicer(object):
-    
+
     def __init__(self, labels, actuator):
         master = None
         self.value = 0
         self.actuator = actuator
         self.b = []
         self.box = Gtk.HBox()
-        for i,e in enumerate(labels):
-            item = Gtk.RadioButton(None, label = e)
+        for i, e in enumerate(labels):
+            item = Gtk.RadioButton(None, label=e)
             if master is None:
                 master = item
             else:
@@ -827,7 +859,7 @@ class Choicer(object):
     def get_text(self):
         return self.value
 
-    
+
 class CamSim(object):
 
     def __init__(self, consumer, fname):
@@ -860,7 +892,8 @@ class CamSim(object):
                 self.imtype = 1
                 self.auto_debayer = 0
         else:
-            raise ValueError("Unsupported color_is %d depth %d" % (self.ser.color_id, self.ser.depth))
+            raise ValueError("Unsupported color_is %d depth %d" % (
+                self.ser.color_id, self.ser.depth))
 
     def start(self):
         if not self.running:
@@ -869,7 +902,7 @@ class CamSim(object):
 
     def stop(self):
         self.running = False
-        
+
     def get_image(self):
         if not self.running:
             return False
@@ -885,13 +918,13 @@ class CamSim(object):
             im = np.dstack(im)
         self.consumer.new_image(im, self.imtype, self.auto_debayer)
         return True
-            
+
     def open(self, idx):
         pass
-    
+
     def close(self):
         pass
-    
+
     def get(self):
         return {}
 
@@ -900,10 +933,10 @@ class CamSim(object):
 
     def set(self, s):
         return None
-            
+
     def auto_exposure(self):
         pass
-    
+
     def list(self):
         return [{'Name':'Simulator'}]
 
@@ -915,11 +948,11 @@ class CamSim(object):
 
     def save_parameters(self, w):
         pass
-    
+
     def load_parameters(self, w):
         pass
-    
-        
+
+
 class DialogMixin(object):
 
     def _assure_mul(self, w, par, mul):
@@ -933,15 +966,15 @@ class DialogMixin(object):
         self._assure_mul(w, "height", 2)
         self.camera_.stop()
         try:
-            r = self.camera_.set(w)
+            self.camera_.set(w)
         except IOError as e:
                 Gtk.MessageDialog(self, 0, Gtk.MessageType.ERROR,
-                                          Gtk.ButtonsType.OK, "Cannot set: %s" % e)
+                                  Gtk.ButtonsType.OK, "Cannot set: %s" % e)
                 self.update()
         self.camera_.start()
         self.update()
-        
-    def _add(self, i, t, e = None, s = None):
+
+    def _add(self, i, t, e=None, s=None):
         l = Gtk.Label()
         l.set_markup(t)
         l.set_justify(Gtk.Justification.RIGHT)
@@ -975,27 +1008,31 @@ class ROIDialog(Gtk.Dialog, DialogMixin):
             "height": int(self._height.get_text()),
             "dest": self._path.get_text(),
             }
-    
+
     def __init__(self, parent, camera):
         Gtk.Dialog.__init__(self, "ROI / Mode", parent, 0,
-            ("R_ecenter ROI", 4,
-             "_Apply", 1,
-             "_Reload", 2,
-             "_Close", 3))
+                            ("R_ecenter ROI", 4,
+                             "_Apply", 1,
+                             "_Reload", 2,
+                             "_Close", 3))
 
         self.camera_ = camera
-        self._par = camera.parameters()        
+        self._par = camera.parameters()
         self._grid = Gtk.Grid()
         self._grid.set_row_homogeneous(True)
         self.prop_ = camera.prop()
         self._mode = self._add(0, "<b>Mode</b>(0-3:RAW8,RGB24,RAW16,Y8)",
-                                   ["RAW8", "RGB24", "RAW16", "Y8"], "type")
-        bint = ["%d" %i for i in self._par["SupportedBins"]]
+                               ["RAW8", "RGB24", "RAW16", "Y8"], "type")
+        bint = ["%d" % i for i in self._par["SupportedBins"]]
         self._bin = self._add(1, "<b>Binning</b>(%s)" % ",".join(bint))
-        self._start_x = self._add(2, "<b>Start X</b>(0-%d)" % self._par["MaxWidth"])
-        self._start_y = self._add(3, "<b>Start Y</b>(0-%d)" % self._par["MaxHeight"])
-        self._width = self._add(4, "<b>Width</b>(0-%d)" % self._par["MaxWidth"])
-        self._height = self._add(5, "<b>Height</b>(0-%d)" % self._par["MaxHeight"])
+        self._start_x = self._add(
+            2, "<b>Start X</b>(0-%d)" % self._par["MaxWidth"])
+        self._start_y = self._add(
+            3, "<b>Start Y</b>(0-%d)" % self._par["MaxHeight"])
+        self._width = self._add(
+            4, "<b>Width</b>(0-%d)" % self._par["MaxWidth"])
+        self._height = self._add(
+            5, "<b>Height</b>(0-%d)" % self._par["MaxHeight"])
         self._path = self._add(6, "<b>Save Prefix</b>")
         box = self.get_content_area()
         box.add(self._grid)
@@ -1015,7 +1052,8 @@ class ROIDialog(Gtk.Dialog, DialogMixin):
             bheight = self._par["MaxHeight"] / bi
             height = bheight * pa / 4
             y = (bheight - height) / 2
-            b = Gtk.Button.new_with_mnemonic("_%d:%dx%dx%d" % (i + 1, width, height, bi))
+            b = Gtk.Button.new_with_mnemonic(
+                "_%d:%dx%dx%d" % (i + 1, width, height, bi))
             s = {
                 "bin": bi,
                 "start_x": x,
@@ -1027,7 +1065,7 @@ class ROIDialog(Gtk.Dialog, DialogMixin):
             button_grid.attach(b, i % 4, i // 4, 1, 1)
 
         self.show_all()
-        
+
     def update(self):
         s = self.camera_.get()
         self._mode.set_text("%d" % s["type"])
@@ -1051,14 +1089,14 @@ class ROIDialog(Gtk.Dialog, DialogMixin):
             self._start_y.set_text("%d" % (
                 (self._par["MaxHeight"] - int(self._height.get_text())) / 2))
 
-        
+
 class SettingsDialog(Gtk.Dialog, DialogMixin):
 
     def __init__(self, parent, camera):
         Gtk.Dialog.__init__(self, "Camera Settings", parent, 0,
-            ("_Apply", 1,
-             "_Reload", 2,
-             "_Close", 3))
+                            ("_Apply", 1,
+                             "_Reload", 2,
+                             "_Close", 3))
 
         self.camera_ = camera
         self._grid = Gtk.Grid()
@@ -1070,21 +1108,24 @@ class SettingsDialog(Gtk.Dialog, DialogMixin):
         self.handlers_ = []
         i = 0
         for c in self.prop_["controls"]:
-            if c["MinValue"] == 0 and  c["MaxValue"] == 1:
-                e = self._add(i, "<b>%s</b>" % c["Description"], ["Off", "On"], i)
+            if c["MinValue"] == 0 and c["MaxValue"] == 1:
+                e = self._add(i, "<b>%s</b>" % c["Description"],
+                              ["Off", "On"], i)
                 self.ctrl_.append(e)
                 self.auto_.append(None)
                 i = i + 1
                 continue
             if "Flip:" in c["Description"]:
-                e = self._add(i, "<b>%s</b>" % c["Description"], ["Off", "Horz", "Vert", "Both"], i)
+                e = self._add(i, "<b>%s</b>" % c["Description"],
+                              ["Off", "Horz", "Vert", "Both"], i)
                 self.ctrl_.append(e)
                 self.auto_.append(None)
                 i = i + 1
                 continue
             l = Gtk.Label()
             if c["IsWritable"]:
-                l.set_markup("<b>%s</b>(%d-%d)" %(c["Description"], c["MinValue"], c["MaxValue"]))
+                l.set_markup("<b>%s</b>(%d-%d)" % (
+                    c["Description"], c["MinValue"], c["MaxValue"]))
             else:
                 l.set_markup("<b>%s</b>" % c["Description"])
             l.set_justify(Gtk.Justification.RIGHT)
@@ -1092,14 +1133,16 @@ class SettingsDialog(Gtk.Dialog, DialogMixin):
             self._grid.attach(l, 0, i, 1, 1)
             e = Gtk.Entry()
             if c["IsWritable"]:
-                self.handlers_.append((e, e.connect("activate", lambda w: self._change_values())))
+                self.handlers_.append((
+                    e, e.connect("activate", lambda w: self._change_values())))
             else:
                 e.set_property("editable", False)
             self.ctrl_.append(e)
             if c["IsAutoSupported"]:
                 self._grid.attach(e, 1, i, 1, 1)
                 ch = Gtk.CheckButton()
-                self.handlers_.append((ch, ch.connect("toggled", lambda w: self._change_values())))
+                self.handlers_.append((
+                    ch, ch.connect("toggled", lambda w: self._change_values())))
                 self._grid.attach(ch, 2, i, 1, 1)
                 self.auto_.append(ch)
             else:
@@ -1107,10 +1150,13 @@ class SettingsDialog(Gtk.Dialog, DialogMixin):
                 self._grid.attach(e, 1, i, 2, 1)
             i = i + 1
         l = Gtk.Label()
-        l.set_markup("Offsets HighestDR: %d, UnityGain: %d, LowestRN: %d. Gain LowestRN: %d. ElecPerADU: %f" %(
-            self.prop_["Offset_HighestDR"], self.prop_["Offset_UnityGain"],
-            self.prop_["Offset_LowestRN"], self.prop_["Gain_LowestRN"],
-            self.parameters_["ElecPerADU"]))
+        l.set_markup("Offsets HighestDR: %d, UnityGain: %d, LowestRN: "
+                     "%d. Gain LowestRN: %d. ElecPerADU: %f" % (
+                         self.prop_["Offset_HighestDR"],
+                         self.prop_["Offset_UnityGain"],
+                         self.prop_["Offset_LowestRN"],
+                         self.prop_["Gain_LowestRN"],
+                         self.parameters_["ElecPerADU"]))
         self._grid.attach(l, 0, i, 3, 1)
         box = self.get_content_area()
         box.add(self._grid)
@@ -1120,9 +1166,9 @@ class SettingsDialog(Gtk.Dialog, DialogMixin):
 
     def update(self):
         for i, h in self.handlers_:
-            GObject.signal_handler_block(i,h)
+            GObject.signal_handler_block(i, h)
         s = self.camera_.get()
-        for e,a,ie,ia in zip(self.ctrl_, self.auto_, s["vals"], s["auto"]):
+        for e, a, ie, ia in zip(self.ctrl_, self.auto_, s["vals"], s["auto"]):
             e.set_text("%d" % ie)
             if a:
                 a.set_active(ia)
@@ -1135,13 +1181,13 @@ class SettingsDialog(Gtk.Dialog, DialogMixin):
             "auto": [x and x.get_active() for x in self.auto_]
             }
         return r
-            
+
     def _setter(self, s, v):
         st = self.camera_.get()
         sc = st["vals"]
         sc[s] = v
         self._change_values({"vals": sc})
-        
+
     def on_response(self, w, e):
         if e == 2:
             self.update()
@@ -1149,14 +1195,15 @@ class SettingsDialog(Gtk.Dialog, DialogMixin):
             self._change_values()
         elif e == 3 or e == -4:
             self.hide()
-        
-        
+
+
 class MenuManager(Gtk.MenuBar):
 
     def _save_snapshot(self, w):
         if self._im.pb is None:
             return
-        fname = "yaaca_snap_{:%Y-%m-%d_%H:%M:%S}.jpg".format(datetime.datetime.now())
+        fname = "yaaca_snap_{:%Y-%m-%d_%H:%M:%S}.jpg".format(
+            datetime.datetime.now())
         self._im.pb.savev(fname, "jpeg", (), ())
 
     def _run_ext(self, cmd):
@@ -1165,7 +1212,7 @@ class MenuManager(Gtk.MenuBar):
         fname = tempfile.mktemp()
         self._im.pb.savev(fname, "jpeg", (), ())
         os.system('%s %s &' % (cmd, fname))
-        
+
     def __init__(self, parent, camera, im):
         self._parent = parent
         self._camera = camera
@@ -1175,7 +1222,7 @@ class MenuManager(Gtk.MenuBar):
         self._settings = None
         self._roi = None
         Gtk.MenuBar.__init__(self)
-        
+
         _file_menu = self._add_sub_menu("_File")
         for i, c in enumerate(self._camera.list()):
             self._add_radio(_file_menu, 'cameras',
@@ -1183,15 +1230,17 @@ class MenuManager(Gtk.MenuBar):
                             lambda w, i=i: self._change_camera(i),
                             False)
         self._add_separator(_file_menu)
-        self._add_entry(_file_menu,
-                            "Save parameters", lambda w: self._camera.save_parameters(self._parent))
-        self._add_entry(_file_menu,
-                            "Load parameters", lambda w: self._camera.load_parameters(self._parent))
+        self._add_entry(
+            _file_menu, "Save parameters",
+            lambda w: self._camera.save_parameters(self._parent))
+        self._add_entry(
+            _file_menu, "Load parameters",
+            lambda w: self._camera.load_parameters(self._parent))
         self._add_separator(_file_menu)
         self._add_entry(_file_menu, "Save Snapshot", self._save_snapshot)
-        solver="/usr/lib/astrolove/solver.sh"
+        solver = "/usr/lib/astrolove/solver.sh"
         if os.path.isfile("./solver.sh"):
-            solver="./solver.sh"
+            solver = "./solver.sh"
         self._add_entry(_file_menu, "Solve", lambda w: self._run_ext(solver))
         self._add_separator(_file_menu)
         self._add_entry(_file_menu, "Quit", Gtk.main_quit)
@@ -1203,16 +1252,17 @@ class MenuManager(Gtk.MenuBar):
                         "Stop", lambda _: self._camera.stop())
         self._rec_toggle = self._add_check(
             _camera_menu, "Record", lambda w: self._toggle_int(w, "recording"))
-        self._add_check(_camera_menu, "Long Exposure mode", lambda w: self._toggle_int(w, "mode"))
+        self._add_check(_camera_menu, "Long Exposure mode",
+                        lambda w: self._toggle_int(w, "mode"))
         self._add_entry(_camera_menu,
                         "Settings", self._show_settings)
         self._add_entry(_camera_menu,
                         "ROI/Mode", self._show_roi)
-        
+
         _view_menu = self._add_sub_menu("_View")
         self._zoom_radio = []
         for c in [4, 2, 1, 0.5, 0.25]:
-            active=False
+            active = False
             if c == 1:
                 active = True
                 self._im.set_zoom(c)
@@ -1220,31 +1270,50 @@ class MenuManager(Gtk.MenuBar):
                             "Zoom %sx" % c,
                             lambda w, c=c: self._im.set_zoom(c),
                             active)
-            
+
         self._add_separator(_view_menu)
-        self._add_radio(_view_menu, 'debayer', "Raw", lambda w: self._set_int("auto_debayer", 0), True)
-        self._add_radio(_view_menu, 'debayer', "Full debayer", lambda w: self._set_int("auto_debayer", 1), False)
-        self._add_radio(_view_menu, 'debayer', "Fast debayer", lambda w: self._set_int("auto_debayer", 2), False)
-        
+        self._add_radio(_view_menu, 'debayer', "Raw",
+                        lambda w: self._set_int("auto_debayer", 0), True)
+        self._add_radio(_view_menu, 'debayer', "Full debayer",
+                        lambda w: self._set_int("auto_debayer", 1), False)
+        self._add_radio(_view_menu, 'debayer', "Fast debayer",
+                        lambda w: self._set_int("auto_debayer", 2), False)
+
         self._add_separator(_view_menu)
-        self._add_check(_view_menu, "Cross", lambda w: self._im.set_cross(w.get_active()))
-        self._add_entry(_view_menu, "Center Cross", lambda w: self._im.center_cross())
-        self._add_entry(_view_menu, "Center FoV", lambda w: self._im.center_fov())
-        self._add_check(_view_menu, "Histogram", lambda w: self._im.set_histo(w.get_active()))
-        
+        self._add_check(_view_menu, "Cross",
+                        lambda w: self._im.set_cross(w.get_active()))
+        self._add_entry(_view_menu, "Center Cross",
+                        lambda w: self._im.center_cross())
+        self._add_entry(_view_menu, "Center FoV",
+                        lambda w: self._im.center_fov())
+        self._add_check(_view_menu, "Histogram",
+                        lambda w: self._im.set_histo(w.get_active()))
+
         self._add_separator(_view_menu)
-        self._do_saa = self._add_check(_view_menu, "SAA", lambda w: self._im.set_saa(w.get_active()))
-        self._add_entry(_view_menu, "Reset SAA", lambda w: self._im.reset_saa())
-        self._sub_dark = self._add_check(_view_menu, "Add Dark", lambda w: self._im.do_add_dark(
-            w.get_active()))
-        self._add_entry(_view_menu, "Reset Dark", lambda w: self._im.reset_dark())
-        self._gamma_stretch = self._add_check(_view_menu, "Gamma Stretch", lambda w: self._im.do_gamma_stretch(
-            w.get_active()))
-        
+        self._do_saa = self._add_check(
+            _view_menu, "SAA",
+            lambda w: self._im.set_saa(w.get_active()))
+        self._add_entry(_view_menu, "Reset SAA",
+                        lambda w: self._im.reset_saa())
+        self._sub_dark = self._add_check(
+            _view_menu, "Add Dark", lambda w: self._im.do_add_dark(
+                w.get_active()))
+        self._add_entry(_view_menu, "Reset Dark",
+                        lambda w: self._im.reset_dark())
+        self._gamma_stretch = self._add_check(
+            _view_menu, "Gamma Stretch", lambda w: self._im.do_gamma_stretch(
+                w.get_active()))
+
         self._add_separator(_view_menu)
-        self._add_radio(_view_menu, 'disp_mode', "Show Processed", lambda w: self._set_disp_mode("Show Processed"), True)
-        self._add_radio(_view_menu, 'disp_mode', "Show SAA/Dark", lambda w: self._set_disp_mode("Show SAA/Dark"), False)
-        self._add_radio(_view_menu, 'disp_mode', "Show Raw", lambda w: self._set_disp_mode("Show Raw"), False)
+        self._add_radio(
+            _view_menu, 'disp_mode', "Show Processed",
+            lambda w: self._set_disp_mode("Show Processed"), True)
+        self._add_radio(
+            _view_menu, 'disp_mode', "Show SAA/Dark",
+            lambda w: self._set_disp_mode("Show SAA/Dark"), False)
+        self._add_radio(
+            _view_menu, 'disp_mode', "Show Raw",
+            lambda w: self._set_disp_mode("Show Raw"), False)
 
         self.show_all
 
@@ -1258,7 +1327,7 @@ class MenuManager(Gtk.MenuBar):
         else:
             self._im.show_saa_dark(False)
             self._im.show_fast(False)
-        
+
     def _do_toggle(self, w):
         w.set_active(not w.get_active())
 
@@ -1267,12 +1336,12 @@ class MenuManager(Gtk.MenuBar):
         self._add_dark.set_active(False)
         self._sub_dark.set_active(False)
         self._im.reset_all()
-        
+
     def _set_int(self, s, val):
         self._camera.stop()
         self._camera.set({s: val})
         self._camera.start()
-        
+
     def _toggle_int(self, w, s):
         if w.get_active():
             val = 1
@@ -1281,7 +1350,7 @@ class MenuManager(Gtk.MenuBar):
         self._camera.stop()
         self._camera.set({s: val})
         self._camera.start()
-        
+
     def _change_camera(self, i):
         if self._current != i:
             if self._settings:
@@ -1292,7 +1361,7 @@ class MenuManager(Gtk.MenuBar):
                 self._roit = None
             self._camera.run(i)
             self._current = i
-        
+
     def _add_sub_menu(self, name):
         sub = Gtk.MenuItem.new_with_mnemonic(name)
         self.append(sub)
@@ -1301,26 +1370,27 @@ class MenuManager(Gtk.MenuBar):
         return menu
 
     def _add_entry(self, menu, name, command):
-        item = Gtk.MenuItem(label = name)
+        item = Gtk.MenuItem(label=name)
         item.connect("activate", command)
         menu.append(item)
 
     def _add_check(self, menu, name, command, on=False):
-        item = Gtk.CheckMenuItem(None, label = name)
+        item = Gtk.CheckMenuItem(None, label=name)
         if on:
             item.set_active(True)
         item.connect("activate", command)
         menu.append(item)
         return item
-        
+
     def _add_radio(self, menu, group, name, command, active):
-        item = Gtk.RadioMenuItem(label = name, group = self._groups.get(group, None))
+        item = Gtk.RadioMenuItem(
+            label=name, group=self._groups.get(group, None))
         self._groups[group] = item
         item.connect("activate", command)
         if active:
             item.set_active(active)
         menu.append(item)
-        
+
     def _add_separator(self, menu):
         menu.append(Gtk.SeparatorMenuItem())
 
@@ -1336,7 +1406,7 @@ class MenuManager(Gtk.MenuBar):
         self._roi.update()
         self._roi.show()
 
-        
+
 class Mainwindow(Gtk.Window):
 
     def _handle_key(self, w, ev):
@@ -1378,7 +1448,9 @@ class Mainwindow(Gtk.Window):
             self.camera.camera.pulse(self._arrows[ev.keyval], False)
 
     def __init__(self, *args, **kwargs):
-        Gtk.Window.__init__(self, title="YAACA", default_width=800, default_height=600, *args, **kwargs)
+        Gtk.Window.__init__(
+            self, title="YAACA", default_width=800,
+            default_height=600, *args, **kwargs)
         self.imman = ImageManager()
 
         if os.getenv("YAACA_SIM"):
@@ -1390,7 +1462,7 @@ class Mainwindow(Gtk.Window):
         self.add(box)
         self.menu = MenuManager(self, self.camera, self.imman)
         box.pack_start(self.menu, False, False, 0)
-        
+
         main_box = Gtk.HBox()
         box.pack_start(main_box, True, True, 0)
         main_box.pack_start(self.imman.main, True, True, 0)
@@ -1413,7 +1485,7 @@ class Mainwindow(Gtk.Window):
 
         self.connect("delete-event", Gtk.main_quit)
         self.show_all()
-        
+
 
 window = Mainwindow()
 Gtk.main()
