@@ -1,5 +1,3 @@
-#!/usr/bin/env python2
-
 import re
 import os
 import struct
@@ -71,23 +69,18 @@ def write_pgm_255(filename, arr):
     narr = narr.transpose()
     sarr = narr.shape
     f = open(filename,'wb')
-    f.write('P5\n%d %d\n255\n'%(sarr[1], sarr[0]))
+    f.write(b'P5\n%d %d\n255\n'%(sarr[1], sarr[0]))
     narr.tofile(f)
     f.close()
-
-def swab(arr):
-    h = arr / 256
-    l = arr % 256
-    return h + l * 256
 
 def write_pgm_65535(filename, arr):
     arr = arr.clip(0, 65535)
     narr = arr.astype(np.uint16)
     narr = narr.transpose()
-    narr = swab(narr)
+    narr.byteswap(True)
     sarr = narr.shape
     f = open(filename,'wb')
-    f.write('P5\n%d %d\n65535\n'%(sarr[1], sarr[0]))
+    f.write(b'P5\n%d %d\n65535\n'%(sarr[1], sarr[0]))
     narr.tofile(f)
     f.close()
 
@@ -126,7 +119,7 @@ def write_ppm_255(filename, imm):
     narr = narr.transpose((1,0,2))
     sarr = narr.shape
     f = open(filename,'wb')
-    f.write('P6\n%d %d\n255\n'%(sarr[1], sarr[0]))
+    f.write(b'P6\n%d %d\n255\n'%(sarr[1], sarr[0]))
     narr.tofile(f)
     f.close()
 
@@ -135,10 +128,10 @@ def write_ppm_65535(filename, imm):
     arr = np.dstack(imm)
     narr = arr.astype(np.uint16)
     narr = narr.transpose((1,0,2))
-    narr = swab(narr)
+    narr.byteswap(True)
     sarr = narr.shape
     f = open(filename,'wb')
-    f.write('P6\n%d %d\n65535\n'%(sarr[1], sarr[0]))
+    f.write(b'P6\n%d %d\n65535\n'%(sarr[1], sarr[0]))
     narr.tofile(f)
     f.close()
 
