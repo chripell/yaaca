@@ -70,7 +70,7 @@ def write_pgm_255(filename, arr):
     narr = arr.astype(np.uint8)
     narr = narr.transpose()
     sarr = narr.shape
-    f = open(filename,'w')
+    f = open(filename,'wb')
     f.write('P5\n%d %d\n255\n'%(sarr[1], sarr[0]))
     narr.tofile(f)
     f.close()
@@ -86,7 +86,7 @@ def write_pgm_65535(filename, arr):
     narr = narr.transpose()
     narr = swab(narr)
     sarr = narr.shape
-    f = open(filename,'w')
+    f = open(filename,'wb')
     f.write('P5\n%d %d\n65535\n'%(sarr[1], sarr[0]))
     narr.tofile(f)
     f.close()
@@ -125,7 +125,7 @@ def write_ppm_255(filename, imm):
     narr = arr.astype(np.uint8)
     narr = narr.transpose((1,0,2))
     sarr = narr.shape
-    f = open(filename,'w')
+    f = open(filename,'wb')
     f.write('P6\n%d %d\n255\n'%(sarr[1], sarr[0]))
     narr.tofile(f)
     f.close()
@@ -137,7 +137,7 @@ def write_ppm_65535(filename, imm):
     narr = narr.transpose((1,0,2))
     narr = swab(narr)
     sarr = narr.shape
-    f = open(filename,'w')
+    f = open(filename,'wb')
     f.write('P6\n%d %d\n65535\n'%(sarr[1], sarr[0]))
     narr.tofile(f)
     f.close()
@@ -827,7 +827,7 @@ class SerWriter:
         if out_file == "-":
             self.fd = sys.stdout
         else:
-            self.fd = open(out_file, "w")
+            self.fd = open(out_file, "wb")
         self.w = shape[0]
         self.h = shape[1]
         self.channels = channels
@@ -888,7 +888,7 @@ class SerReader:
         if in_file == "-":
             self.fd = sys.stdout
         else:
-            self.fd = open(in_file, "r")
+            self.fd = open(in_file, "rb")
         hdr = self.fd.read(178)
         (id, lu_id, self.color_id, end, self.width, self.height, self.depth, self.count,
          obsrver, instrument, telescope, dt, dt_utc) = struct.unpack(SER_HEADER, hdr)
