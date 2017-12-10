@@ -88,7 +88,7 @@ def prev_pow(x):
     p = 1
     while p < x:
         p *= 2
-    return p / 2
+    return p // 2
 
 def prepare_image(n):
     global crop_w, crop_h, roi_w, roi_h, roi_x, roi_y
@@ -99,13 +99,13 @@ def prepare_image(n):
     if crop_h == -1 :
         crop_h = imRGB[0].shape[1]
     if roi_w == -1 :
-        roi_w = prev_pow(crop_w / 2)
+        roi_w = prev_pow(crop_w // 2)
     if roi_h == -1 :
-        roi_h = prev_pow(crop_h / 2)
+        roi_h = prev_pow(crop_h // 2)
     if roi_x == -1 :
-        roi_x = (imRGB[0].shape[0] - roi_w) / 2
+        roi_x = (imRGB[0].shape[0] - roi_w) // 2
     if roi_y == -1 :
-        roi_y = (imRGB[0].shape[1] - roi_h) / 2
+        roi_y = (imRGB[0].shape[1] - roi_h) // 2
     imRGB = [x.astype(AL.myfloat) for x in imRGB]
     if dark != "N":
         imRGB = [x - y for x,y in zip(imRGB, darkf)]
@@ -202,7 +202,7 @@ def process_image(ii):
     else:
         xshift = 0
         yshift = 0
-    print(("%s: %d,%d %f %f" % (n, xshift, yshift, angle, success)))
+    print(("%s: %d,%d %f %d" % (n, xshift, yshift, angle, success)))
     imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imRGB]
     save_image(idx + 1, imout, im_mode)
     if im_mode == 16:

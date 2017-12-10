@@ -577,7 +577,6 @@ def load_stack(im_list, n, dataMode, im_mode, group, ch, x, y, w, h):
     stack = []
     imw = []
     for xxx in range(n):
-        #print "step ", xxx, "/", n - 1, " group ", group,  " loading ", im_list[xxx]
         im = load_pic(im_list[xxx], im_mode)[ch][x:(x+w),y:(y+h)]
         im = im.astype(myfloat)
         width = im.shape[0]

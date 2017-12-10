@@ -55,7 +55,7 @@ imf = AL.load_pic(all_frames[0], im_mode)
 channels = len(imf)
 
 w, h = imf[0].shape
-(cw, ch) = [i/chunks for i in (w, h)]
+(cw, ch) = [i//chunks for i in (w, h)]
 xs = [i*cw for i in range(chunks)]
 ys = [i*ch for i in range(chunks)]
 
