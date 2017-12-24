@@ -6149,6 +6149,48 @@ void CLASS parse_smal (int offset, int fsize)
   if (ver == 9) load_raw = &CLASS smal_v9_load_raw;
 }
 
+static long pgm_data_offset;
+
+void CLASS pgm_load_raw()
+{
+  int i;
+  uint16_t *p;
+
+  fseek (ifp, pgm_data_offset, SEEK_SET);
+  fread (raw_image, width * height * 2, 1, ifp);
+  p = (uint16_t *) raw_image;
+  for (i = 0; i < width * height; i++) {
+    p[i] = ntohs(p[i]);
+  }
+}
+
+void CLASS parse_pgm (int offset, int fsize)
+{
+  char buf[101];
+  char *next;
+
+  fseek (ifp, offset, SEEK_SET);
+  black = 0;
+  maximum = 65535;
+  strcpy (cdesc, "GRGB");
+  filters = 0x61616161;
+  fgets (buf, 100, ifp);
+  if (strcmp("P5\n", buf))
+    return;
+  fgets (buf, 100, ifp);
+  raw_width  = width  = strtoul(buf, &next, 10);
+  if (next == NULL || buf == next)
+    return;
+  raw_height = height = strtoul(next, &next, 0);
+  fgets (buf, 100, ifp);
+  if (strcmp("65535\n", buf))
+    return;
+  strcpy (make, "PGM");
+  sprintf (model, "PGM %dx%d", width, height);
+  pgm_data_offset = ftell(ifp);
+  load_raw = &CLASS pgm_load_raw;
+}
+
 void CLASS parse_cine()
 {
   unsigned off_head, off_setup, off_image, i;
@@ -7804,6 +7846,7 @@ void CLASS identify()
       }
   if (zero_fsize) fsize = 0;
   if (make[0] == 0) parse_smal (0, flen);
+  if (make[0] == 0) parse_pgm (0, flen);
   if (make[0] == 0) {
     parse_jpeg(0);
     if (!(strncmp(model,"ov",2) && strncmp(model,"RP_OV",5)) &&
