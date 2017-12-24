@@ -518,7 +518,6 @@ def rank(method, stack, width, height, par):
 
 def kappasigma(stack, par):
     #print "kappa=", par["kappa"]
-    median=np.median(stack, axis=0)
     mean=np.mean(stack, axis=0)
     std =np.std (stack, axis=0)
     out =np.zeros(mean.shape)
@@ -633,7 +632,7 @@ def gamma_stretch(im, mv=65535.0):
     mi = min([x.min() for x in im])
     ma = max([x.max() for x in im])
     k = mv / (ma - mi)
-    im = [ (x - mi) * k for x in im]
+    im = [(x - mi) * k for x in im]
     return im
 
 def load_pic(fname, im_mode):
