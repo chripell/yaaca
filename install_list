@@ -11,3 +11,4 @@ sertoppm.py,/usr/lib/astrolove
 stack.py,/usr/lib/astrolove
 astrolove/astrolib.py,/usr/lib/astrolove
 README.md,/usr/lib/astrolove
+astrolove/dcraw-astrolove,/usr/lib/astrolove

@@ -46,4 +46,5 @@ libusb-1.0.20/tests/Makefile
 *.ser
 pkg
 src
+astrolove/dcraw-astrolove
 

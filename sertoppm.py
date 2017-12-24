@@ -12,14 +12,16 @@ from optparse import OptionParser
 parser = OptionParser(usage = "usage: %prog [opts] " + AL.expand_file_list_help)
 
 parser.add_option("--out", type = "string", default = "image%04d",
-                      help = "output file template, default image%04d")
+                  help = "output file template, default image%04d")
 parser.add_option("--raw", action="store_true", dest="is_raw")
 parser.add_option("--mode", type = "int", default = 3,
-                      help = "debayer mode")
+                  help = "debayer mode: 0,1=built-in, 2=superpixel, 3=opencv, 4=dcraw")
 parser.add_option("--mono", action="store_true", dest="is_mono")
+parser.add_option("--opt", type = "string", default = "-v -H 0 -o 0 -q 3 -4 -t 0",
+                  help = "options for dcraw debayering")
 (options, args) = parser.parse_args()
 
-ser = AL.SerReader(args[0], options.is_raw, options.mode)
+ser = AL.SerReader(args[0], options.is_raw, options.mode, options.opt)
 
 for i in range(ser.count):
     im = ser.get()

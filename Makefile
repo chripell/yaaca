@@ -6,7 +6,7 @@ ASILIB_32=lib/x86/libASICamera2.a
 
 INSTALL_LIST=$(shell cat install_list | tr '\n' ' ')
 
-all: astrolove/libyaaca.so.1 recorder
+all: astrolove/libyaaca.so.1 recorder astrolove/dcraw-astrolove
 
 astrolove/libyaaca.so.1: yaaca_server.c yaaca_server.h
 	gcc -ggdb -pthread -D_GNU_SOURCE -O2 -std=c99 -Iinclude -I jsmn -fPIC -g -c -Wall \
@@ -22,6 +22,9 @@ recorder: recorder.c
 recorder-libusb: recorder.c
 	gcc -ggdb -pthread -DSELF_BULK -D_GNU_SOURCE -std=c99 -Iinclude -g -c -Wall recorder.c
 	g++ -ggdb -pthread recorder.o ${ASILIB_${ARCH}} ./libusb-1.0.20/libusb/.libs/libusb-1.0.a -ludev -lc -o recorder-libusb
+
+astrolove/dcraw-astrolove:
+	gcc -O4 -o astrolove/dcraw-astrolove astrolove/dcraw.c -lm -DNODEPS
 
 clean:
 	rm -f *~ *.so.* *.o *.pyc recorder recorder-libusb astrolove/*.so.* astrolove/*.pyc

@@ -2,6 +2,8 @@ import re
 import os
 import struct
 import numpy as np
+import shutil
+import tempfile
 
 try:
     import scipy.stats as stats
@@ -688,10 +690,26 @@ def expand_args(args):
             r.append(i)
     return r
 
-(DEBAYER_NONE, DEBAYER_BGGR, DEBAYER_GRBG) = list(range(3))
-(DEBAYER_VECTOR_MEDIAN, DEBAYER_VECTOR_MEAN, DEBAYER_SUPER_PIXEL, DEBAYER_OPENCV1) = list(range(4))
 
-def demosaic(nim,pattern,method=DEBAYER_OPENCV1):
+(DEBAYER_NONE, DEBAYER_BGGR, DEBAYER_GRBG) = list(range(3))
+(DEBAYER_VECTOR_MEDIAN, DEBAYER_VECTOR_MEAN, DEBAYER_SUPER_PIXEL,
+ DEBAYER_OPENCV1, DEBAYER_DCRAW) = list(range(5))
+
+
+def dcraw_debayer(nim, opt):
+    dcraw = os.path.join(os.path.dirname(__file__), "dcraw-astrolove")
+    if not(os.path.isfile(dcraw) and os.access(dcraw, os.X_OK)):
+        return
+    tmp = tempfile.mkdtemp()
+    fin = os.path.join(tmp, "img.pgm")
+    write_pgm_65535(fin, nim)
+    os.system(dcraw + " " + opt + " " + fin)
+    fout = os.path.join(tmp, "img.ppm")
+    im = read_ppm(fout)
+    shutil.rmtree(tmp)
+    return im
+
+def demosaic(nim,pattern,method=DEBAYER_OPENCV1,opt=""):
     if method <= DEBAYER_VECTOR_MEAN:
         return demosaic_base(nim, pattern, method)
     if method == DEBAYER_SUPER_PIXEL:
@@ -706,6 +724,9 @@ def demosaic(nim,pattern,method=DEBAYER_OPENCV1):
         if pattern == DEBAYER_GRBG:
             im = cv2.cvtColor(nim, cv2.COLOR_BAYER_GR2RGB)
             return [im[:,:,0], im[:,:,1], im[:,:,2]]
+    if method == DEBAYER_DCRAW:
+        if pattern == DEBAYER_GRBG:
+            return dcraw_debayer(nim, opt)
 
 def demosaic_base(nim,pattern,method=DEBAYER_VECTOR_MEDIAN):
     #print "Demosaic:",nim.shape
@@ -873,9 +894,10 @@ class SerWriter:
             
 class SerReader:
 
-    def __init__(self, in_file, raw=False, mode=0):
+    def __init__(self, in_file, raw=False, mode=0, opt=""):
         self.raw = raw
         self.mode = mode
+        self.opt = opt
         if in_file == "-":
             self.fd = sys.stdout
         else:
@@ -903,7 +925,7 @@ class SerReader:
             r = r.transpose()
             if self.raw or self.color_id == 0:
                 return [r]
-            return demosaic(r, 2, self.mode)
+            return demosaic(r, 2, self.mode, self.opt)
         elif self.color_id == 101:
             if self.depth == 8:
                 b = 1
