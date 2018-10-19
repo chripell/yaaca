@@ -6,10 +6,13 @@ import multiprocessing
 import numpy as np
 from astropy.io import fits
 from optparse import OptionParser
+from collections import namedtuple
 sys.path.append(os.path.join(os.path.dirname(__file__), "astrolove"))
 sys.path.append("/usr/lib/astrolove")
 import astrolib as AL
 
+
+ImageWork = namedtuple("ImageWork", "index filename")
 
 parser = OptionParser(usage="usage: %prog [opts] " + AL.expand_file_list_help)
 parser.add_option("--out", type="string", default="image%04d",
@@ -27,14 +30,17 @@ parser.add_option("--cores", type="int", default=1,
 
 
 def process_image(x):
-    idx = x[0]
-    img = x[1]
-    with fits.open(img) as hdul:
-        data = np.flip(hdul['PRIMARY'].data.transpose(), 1)
-        if options.is_raw:
-            AL.write_pgm_65535((options.out % idx)+".pgm", data)
+    with fits.open(x.filename) as hdul:
+        data = hdul['PRIMARY'].data
+        if options.is_raw or options.is_mono:
+            AL.write_pgm_65535((options.out % x.index)+".pgm",
+                               np.flip(data.transpose(), 1))
+            return
+        color = AL.demosaic(data, 2, options.mode, options.opt)
+        AL.write_ppm_65535((options.out % x.index) + ".ppm",
+                           [np.flip(i.transpose(), 1) for i in color])
 
 
 pool = multiprocessing.Pool(options.cores)
 pool.map(process_image,
-         [(i, x) for i, x in enumerate(args)])
+         [ImageWork(i, x) for i, x in enumerate(args)])
