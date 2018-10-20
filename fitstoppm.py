@@ -32,13 +32,18 @@ parser.add_option("--cores", type="int", default=1,
 def process_image(x):
     with fits.open(x.filename) as hdul:
         data = hdul['PRIMARY'].data
-        if options.is_raw or options.is_mono:
+        if options.is_raw:
             AL.write_pgm_65535((options.out % x.index)+".pgm",
                                np.flip(data.transpose(), 1))
             return
         color = AL.demosaic(data, 2, options.mode, options.opt)
+        color = [np.flip(i.transpose(), 1) for i in color]
+        if options.is_mono:
+            AL.write_pgm_65535(
+                (options.out % x.index)+".pgm",
+                0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2])
         AL.write_ppm_65535((options.out % x.index) + ".ppm",
-                           [np.flip(i.transpose(), 1) for i in color])
+                           color)
 
 
 pool = multiprocessing.Pool(options.cores)
