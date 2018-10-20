@@ -42,6 +42,7 @@ def process_image(x):
             AL.write_pgm_65535(
                 (options.out % x.index)+".pgm",
                 0.299 * color[0] + 0.587 * color[1] + 0.114 * color[2])
+            return
         AL.write_ppm_65535((options.out % x.index) + ".ppm",
                            color)
 
