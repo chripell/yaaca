@@ -33,11 +33,9 @@ def process_image(x):
     with fits.open(x.filename) as hdul:
         data = hdul['PRIMARY'].data
         if options.is_raw:
-            AL.write_pgm_65535((options.out % x.index)+".pgm",
-                               np.flip(data.transpose(), 1))
+            AL.write_pgm_65535((options.out % x.index)+".pgm", data)
             return
         color = AL.demosaic(data, 2, options.mode, options.opt)
-        color = [np.flip(i.transpose(), 1) for i in color]
         if options.is_mono:
             AL.write_pgm_65535(
                 (options.out % x.index)+".pgm",
