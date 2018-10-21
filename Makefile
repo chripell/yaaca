@@ -32,4 +32,5 @@ clean:
 deb: all
 	./make_deb.sh yaaca "Astrocapture for ZWO ASI cams" "libgtk-3-0 (>= 3.10.8), libusb-1.0-0 (>= 2:1.0.17), python (>= 2.7.5), python-gi (>= 3.12.0), python-gi-cairo (>= 3.12.0), python-numpy (>= 1:1.8.2), python-scipy (>= 0.13.3)" ${INSTALL_LIST}
 
-
+TAGS:
+	(find . -type f -iname "*.[ch]"; find . -type f -iname "*.py") | etags -
