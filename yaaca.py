@@ -111,10 +111,10 @@ class ImageManager(object):
     def get_box(self):
         x = int(self.px)
         if x < 0 or x >= self.im_width:
-            x = self.im_width / 2
+            x = self.im_width // 2
         y = (self.py)
         if y < 0 or y >= self.im_height:
-            y = self.im_height / 2
+            y = self.im_height // 2
         d = self.box_size
         if d < 16:
             d = 16
@@ -266,7 +266,7 @@ class ImageManager(object):
             if ((nauto_debayer == 2
                  and nimtype == 0) or (nauto_debayer == 2 and nimtype == 2)):
                 (h, w, c) = nim.shape
-                self.im = nim.reshape(2*h, w/2, c)[:h/2, :, :]
+                self.im = nim.reshape(2*h, w//2, c)[:h//2, :, :]
             else:
                 self.im = nim
             self.imtype = nimtype
@@ -838,7 +838,7 @@ class Choicer(object):
         self.b = []
         self.box = Gtk.HBox()
         for i, e in enumerate(labels):
-            item = Gtk.RadioButton(None, label=e)
+            item = Gtk.RadioButton(label=e)
             if master is None:
                 master = item
             else:
@@ -1010,11 +1010,14 @@ class ROIDialog(Gtk.Dialog, DialogMixin):
             }
 
     def __init__(self, parent, camera):
-        Gtk.Dialog.__init__(self, "ROI / Mode", parent, 0,
-                            ("R_ecenter ROI", 4,
-                             "_Apply", 1,
-                             "_Reload", 2,
-                             "_Close", 3))
+        Gtk.Dialog.__init__(self,
+                            title="ROI / Mode",
+                            parent=parent,
+                            flags=0)
+        self.add_button("R_ecenter ROI", 4)
+        self.add_button("_Apply", 1)
+        self.add_button("_Reload", 2)
+        self.add_button("_Close", 3)
 
         self.camera_ = camera
         self._par = camera.parameters()
@@ -1375,7 +1378,7 @@ class MenuManager(Gtk.MenuBar):
         menu.append(item)
 
     def _add_check(self, menu, name, command, on=False):
-        item = Gtk.CheckMenuItem(None, label=name)
+        item = Gtk.CheckMenuItem(label=name)
         if on:
             item.set_active(True)
         item.connect("activate", command)
