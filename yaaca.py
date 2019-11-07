@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 import sys
 import os
@@ -10,6 +10,11 @@ try:
     import astrolib as AL
 except ImportError:
     print("Cannot import astrolove, SAA won't work")
+import focuser
+try:
+    import focuser
+except ImportError:
+    print("Cannot import focuser")
 
 import json
 import numpy as np
@@ -83,6 +88,7 @@ class ImageManager(object):
         self.yshift = 0
         self.disp_im = None
         self.gamma_stretch = False
+        self.hook = None
 
     def update_info(self):
         s = "<b>%d</b>,<b>%d</b> box(b,n) <b>%d</b>\nstretch: <b>%d-%d</b>" % (
@@ -160,6 +166,9 @@ class ImageManager(object):
     def reset_saa(self):
         self.nlight = 0
         self.do_saa = False
+
+    def set_hook(self, hook):
+        self.hook = hook
 
     def process_image(self):
         done = False
@@ -281,6 +290,8 @@ class ImageManager(object):
             if self.current is None:
                 return
             im, imtype, auto_debayer = self.redraw_image()
+        if self.hook:
+            im, imtype, auto_debayer = self.hook(im, imtype, auto_debayer)
 
         l = GdkPixbuf.PixbufLoader.new_with_type('pnm')
         done = False
@@ -1216,7 +1227,7 @@ class MenuManager(Gtk.MenuBar):
         self._im.pb.savev(fname, "jpeg", (), ())
         os.system('%s %s &' % (cmd, fname))
 
-    def __init__(self, parent, camera, im):
+    def __init__(self, parent, camera, im, tools):
         self._parent = parent
         self._camera = camera
         self._current = None
@@ -1318,6 +1329,15 @@ class MenuManager(Gtk.MenuBar):
             _view_menu, 'disp_mode', "Show Raw",
             lambda w: self._set_disp_mode("Show Raw"), False)
 
+        _tools_menu = self._add_sub_menu("_Tools")
+        self._tools_active = -1
+        self._tools = tools
+        self._add_radio(_tools_menu, 'tools_menu', 'None',
+                        lambda w: self._tool_activate(-1), True)
+        for i, c in enumerate(tools):
+            self._add_radio(_tools_menu, 'tools_menu', c.menu_name(),
+                            lambda w: self._tool_activate(i), False)
+
         self.show_all
 
     def _set_disp_mode(self, disp_mode):
@@ -1409,6 +1429,130 @@ class MenuManager(Gtk.MenuBar):
         self._roi.update()
         self._roi.show()
 
+    def _tool_activate(self, i):
+        if self._tools_active != -1:
+            self._tools[i].deactivate()
+            self._im.set_hook(None)
+        if i != -1:
+            self._tools[i].activate()
+            self._im.set_hook(self._tools[i].process_image)
+        self._tools_active = i
+
+
+class ToolDialog(Gtk.Dialog, DialogMixin):
+
+    def __init__(self, parent, name):
+        super().__init__(self,
+                         title=name,
+                         parent=parent,
+                         flags=0)
+        self.add_button("_Apply", 1)
+        self.add_button("_Close", 2)
+        self._grid = Gtk.Grid()
+        self._grid.set_row_homogeneous(True)
+        box = self.get_content_area()
+        box.add(self._grid)
+        self.connect("response", self.on_response)
+        self.connect('delete-event', self.on_destroy)
+
+    def ready(self):
+        self.update()
+        self.show_all()
+
+    def on_response(self, w, e):
+        if e == 1:
+            self.commit()
+        self.update()
+        if e == 2:
+            self.hide()
+
+    def update(self):
+        pass
+
+    def commit(self):
+        pass
+
+
+class HiContrastDialog(ToolDialog):
+
+    def __init__(self, parent, hc):
+        self._hc = hc
+        super().__init__(parent, "Hi Contrast")
+        self._rep = self._add(
+            0, "No of BANDS (2-256)")
+        self.ready()
+
+    def update(self):
+        self._rep.set_text("%d" % self._hc.get())
+
+    def commit(self):
+        try:
+            self._hc.update(int(self._rep.get_text()))
+        except ValueError:
+            pass
+
+
+class ToolBox:
+
+    def __init__(self, parent, container_box):
+        self._parent = parent
+        self._dialog = None
+        self._container_box = container_box
+        self._box = Gtk.VBox()
+        self.label = Gtk.Label()
+        self._box.pack_start(Gtk.VSeparator(), False, False, 0)
+        self._box.pack_start(self.label, False, False, 0)
+        b = Gtk.Button.new_with_mnemonic("Configure")
+        b.connect("clicked", self.dialog)
+        self._box.pack_start(b, False, False, 0)
+
+    def dialog(self, w):
+        if not self._dialog:
+            self._dialog = HiContrastDialog(self._parent, self)
+        self._dialog.update()
+        self._dialog.show()
+
+    def activate(self):
+        self._container_box.pack_start(self._box, False, False, 0)
+        self._container_box.show_all()
+
+    def deactivate(self):
+        self._container_box.remove(self._box)
+
+
+class HiContrast(ToolBox):
+
+    def __init__(self, parent, container_box):
+        super().__init__(parent, container_box)
+        self.update(2)
+
+    def menu_name(self):
+        return "Hi Contrast"
+
+    def get(self):
+        return self._v
+
+    def update(self, val):
+        self._v = int(val)
+        if self._v < 2:
+            self._v = 2
+        if self._v > 256:
+            self._v = 256
+        step = 255.0 / (self._v - 1)
+        x = 0.0
+        self._m = np.arange(0, 256, dtype=np.uint8)
+        self._m[0] = 0
+        for i in range(1, 256):
+            x += step
+            if x > 255.0:
+                x = 0.0
+            self._m[i] = int(round(x))
+        self.label.set_markup("Hi Contrast: %d" % self._v)
+
+    def process_image(self, im, imtype, auto_debayer):
+        im = self._m[im]
+        return im, imtype, auto_debayer
+
 
 class Mainwindow(Gtk.Window):
 
@@ -1461,9 +1605,13 @@ class Mainwindow(Gtk.Window):
         else:
             self.camera = CamManager(self.imman)
 
+        self.tool_box = Gtk.VBox()
+        self.tools = (
+            HiContrast(self, self.tool_box),
+        )
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.add(box)
-        self.menu = MenuManager(self, self.camera, self.imman)
+        self.menu = MenuManager(self, self.camera, self.imman, self.tools)
         box.pack_start(self.menu, False, False, 0)
 
         main_box = Gtk.HBox()
@@ -1477,6 +1625,7 @@ class Mainwindow(Gtk.Window):
         rvbox.pack_start(self.camera.sbox, False, False, 0)
         rvbox.pack_start(self.imman.histo_box, False, False, 0)
         rvbox.pack_start(self.imman.info_box, False, False, 0)
+        rvbox.pack_start(self.tool_box, False, False, 0)
 
         self.connect("key_press_event", self._handle_key)
         self.connect("key_release_event", self._handle_key_release)
