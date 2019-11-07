@@ -1107,10 +1107,13 @@ class ROIDialog(Gtk.Dialog, DialogMixin):
 class SettingsDialog(Gtk.Dialog, DialogMixin):
 
     def __init__(self, parent, camera):
-        Gtk.Dialog.__init__(self, "Camera Settings", parent, 0,
-                            ("_Apply", 1,
-                             "_Reload", 2,
-                             "_Close", 3))
+        Gtk.Dialog.__init__(self,
+                            title="Camera Settings",
+                            parent=parent,
+                            flags=0)
+        self.add_button("_Apply", 1)
+        self.add_button("_Reload", 2)
+        self.add_button("_Close", 3)
 
         self.camera_ = camera
         self._grid = Gtk.Grid()
