@@ -20,8 +20,10 @@ import json
 import numpy as np
 import time
 import os
+import glob
 import datetime
 import tempfile
+from PIL import Image
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -873,38 +875,16 @@ class Choicer(object):
 
 class CamSim(object):
 
+    # fname is a glob with images to load.
     def __init__(self, consumer, fname):
         self.sbox = Gtk.VBox()
         self.fname = fname
-        self.ser = AL.SerReader(fname, raw=True)
         self.i = 0
+        self.images = glob.glob(fname)
+        self.n = len(self.images)
         self.running = False
         self.exp = 1000
         self.consumer = consumer
-        if self.ser.color_id == 9:
-            if self.ser.depth == 16:
-                self.imtype = 2
-                self.auto_debayer = 0
-            else:
-                self.imtype = 0
-                self.auto_debayer = 0
-        elif self.ser.color_id == 0:
-            if self.ser.depth == 16:
-                self.imtype = 2
-                self.auto_debayer = 3
-            else:
-                self.imtype = 3
-                self.auto_debayer = 0
-        elif self.ser.color_id == 101:
-            if self.ser.depth == 16:
-                self.imtype = 2
-                self.auto_debayer = 1
-            else:
-                self.imtype = 1
-                self.auto_debayer = 0
-        else:
-            raise ValueError("Unsupported color_is %d depth %d" % (
-                self.ser.color_id, self.ser.depth))
 
     def start(self):
         if not self.running:
@@ -917,17 +897,14 @@ class CamSim(object):
     def get_image(self):
         if not self.running:
             return False
-        print("%d/%d" % (self.i, self.ser.count))
-        im = self.ser.get()
-        im.reverse()
-        im = [i.transpose() for i in im]
+        print("%d/%d: %s" % (self.i, self.n, self.images[self.i]))
+        image = Image.open(self.images[self.i])
+        im = np.array(image)
+        print(im.shape)
+        self.consumer.new_image(im, 1, 0)
         self.i += 1
-        if self.i >= self.ser.count:
-            self.ser = AL.SerReader(self.fname, raw=True)
+        if self.i >= self.n:
             self.i = 0
-        if self.imtype == 2 and self.auto_debayer == 1:
-            im = np.dstack(im)
-        self.consumer.new_image(im, self.imtype, self.auto_debayer)
         return True
 
     def open(self, idx):
