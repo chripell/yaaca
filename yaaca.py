@@ -1472,11 +1472,46 @@ class HiContrastDialog(ToolDialog):
             pass
 
 
+class FocuserDialog(ToolDialog):
+
+    def __init__(self, parent, p):
+        self._p = p
+        super().__init__(parent, "Hi Contrast")
+        self._algo = self._add(
+            0, "Algorith (iraf/dao)")
+        self._metric = self._add(
+            1, "Metric (sharpness/roundness1/roundness2)")
+        self._fwhm = self._add(
+            2, "FWHM")
+        self._threshold_stds = self._add(
+            3, "Threshold in stds")
+        self._down = self._add(
+            4, "Downsample (1-4)")
+        self.ready()
+
+    def update(self):
+        s = self._p.status
+        self._algo.set_text(s['algo'])
+        self._metric.set_text(s['metric'])
+        self._fwhm.set_text('%s' % s['fwhm'])
+        self._threshold_stds.set_text('%s' % s['threshold_stds'])
+        self._down.set_text('%s' % s['down'])
+
+    def commit(self):
+        self._p.update(
+            self._fwhm.get_text(),
+            self._threshold_stds.get_text(),
+            self._algo.get_text(),
+            self._down.get_text(),
+            self._metric.get_text())
+
+
 class ToolBox:
 
-    def __init__(self, parent, container_box):
+    def __init__(self, parent, container_box, dialog):
         self._parent = parent
         self._dialog = None
+        self._dialog_class = dialog
         self._container_box = container_box
         self._box = Gtk.VBox()
         self.label = Gtk.Label()
@@ -1489,7 +1524,7 @@ class ToolBox:
 
     def dialog(self, w):
         if not self._dialog:
-            self._dialog = HiContrastDialog(self._parent, self)
+            self._dialog = self._dialog_class(self._parent, self)
         self._dialog.update()
         self._dialog.show()
 
@@ -1503,7 +1538,7 @@ class ToolBox:
 class Focuser(ToolBox):
 
     def __init__(self, parent, container_box):
-        super().__init__(parent, container_box)
+        super().__init__(parent, container_box, FocuserDialog)
         self.update(fwhm=3.0,
                     threshold_stds=100.,
                     algo='iraf',
@@ -1536,6 +1571,13 @@ class Focuser(ToolBox):
             down = 1
         if down > 4:
             down = 4
+        self.status = {
+            'fwhm': fwhm,
+            'threshold_stds': threshold_stds,
+            'algo': algo,
+            'down': down,
+            'metric': metric,
+        }
 
         self.focuser = focuser.Focuser(
             fwhm=fwhm,
@@ -1584,7 +1626,7 @@ class Focuser(ToolBox):
 class HiContrast(ToolBox):
 
     def __init__(self, parent, container_box):
-        super().__init__(parent, container_box)
+        super().__init__(parent, container_box, HiContrastDialog)
         self.update(2)
 
     def menu_name(self):
