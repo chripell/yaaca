@@ -5,7 +5,7 @@ from collections import namedtuple
 import numpy as np
 
 
-FocusData = namedtuple('FocusData', 'bot p10 mean p90 top std')
+FocusData = namedtuple('FocusData', 'bot p10 mean p90 top std back back_std')
 
 
 class Focuser:
@@ -24,7 +24,8 @@ class Focuser:
 
     def evaluate(self, data):
         mean, median, std = sigma_clipped_stats(data, sigma=3.0, maxiters=5)
-        print(mean, median, std)
+        self.back = median
+        self.back_std = std
         if self.algo == 'dao':
             finder = DAOStarFinder(
                 fwhm=self.fwhm, threshold=self.threshold_stds*std)
@@ -53,7 +54,8 @@ class Focuser:
         std = data.std()
         p10 = np.percentile(data, 10)
         p90 = np.percentile(data, 90)
-        return FocusData(bot, p10, mean, p90, top, std)
+        return FocusData(bot, p10, mean, p90, top, std,
+                         self.back, self.back_std)
 
     def draw(self, cr, par, radius=10):
         mean = self.par[par].mean

@@ -23,6 +23,7 @@ import os
 import glob
 import datetime
 import tempfile
+import cairo
 from PIL import Image
 
 import gi
@@ -883,7 +884,7 @@ class CamSim(object):
         self.images = glob.glob(fname)
         self.n = len(self.images)
         self.running = False
-        self.exp = 1000
+        self.exp = 5000
         self.consumer = consumer
 
     def start(self):
@@ -900,7 +901,6 @@ class CamSim(object):
         print("%d/%d: %s" % (self.i, self.n, self.images[self.i]))
         image = Image.open(self.images[self.i])
         im = np.array(image)
-        print(im.shape)
         self.consumer.new_image(im, 1, 0)
         self.i += 1
         if self.i >= self.n:
@@ -1316,7 +1316,7 @@ class MenuManager(Gtk.MenuBar):
                         lambda w: self._tool_activate(-1), True)
         for i, c in enumerate(tools):
             self._add_radio(_tools_menu, 'tools_menu', c.menu_name(),
-                            lambda w: self._tool_activate(i), False)
+                            lambda w, i=i: self._tool_activate(i), False)
 
         self.show_all
 
@@ -1480,6 +1480,7 @@ class ToolBox:
         self._container_box = container_box
         self._box = Gtk.VBox()
         self.label = Gtk.Label()
+        self.label.set_justify(Gtk.Justification.CENTER)
         self._box.pack_start(Gtk.VSeparator(), False, False, 0)
         self._box.pack_start(self.label, False, False, 0)
         b = Gtk.Button.new_with_mnemonic("Configure")
@@ -1498,6 +1499,86 @@ class ToolBox:
 
     def deactivate(self):
         self._container_box.remove(self._box)
+
+class Focuser(ToolBox):
+
+    def __init__(self, parent, container_box):
+        super().__init__(parent, container_box)
+        self.update(fwhm=3.0,
+                    threshold_stds=100.,
+                    algo='iraf',
+                    down=1,
+                    metric='sharpness')
+
+    def menu_name(self):
+        return "Focuser"
+
+    def update(self, fwhm, threshold_stds, algo, down, metric):
+        try:
+            fwhm = float(fwhm)
+        except ValueError:
+            fwhm = 3.0
+        try:
+            threshold_stds = float(threshold_stds)
+        except ValueError:
+            threshold_stds = 100.0
+        if algo not in ('iraf', 'dao'):
+            algo = 'iraf'
+        if algo == 'iraf':
+            metric = 'sharpness'
+        if metric not in ('sharpness', 'roundness1', 'roundness2'):
+            metric = 'sharpness'
+        try:
+            down = int(down)
+        except ValueError:
+            down = 1
+        if down < 1:
+            down = 1
+        if down > 4:
+            down = 4
+
+        self.focuser = focuser.Focuser(
+            fwhm=fwhm,
+            threshold_stds=threshold_stds,
+            algo=algo,
+        )
+        self.down = down
+        self.l = "Focuser: <b>%s %s</b>\nfwhm: <b>%.1f</b> thr <b>%d</b> :<b>%d</b>" % (
+            algo, metric, fwhm, threshold_stds, self.down)
+        self.label.set_markup(self.l)
+
+    def process_image(self, im, imtype, auto_debayer):
+        start = time.time()
+        down = self.down
+        if len(im.shape) == 3:
+            imR = im[::down, ::down, 0]
+            imG = im[::down, ::down, 1]
+            imB = im[::down, ::down, 2]
+            imL = 0.299 * imR + 0.587 * imG + 0.114 * imB
+        else:
+            imL = im[::down, ::down]
+        imL = imL.astype(np.uint8)
+        self.focuser.evaluate(imL)
+        if self.focuser.num() == 0:
+            self.label.set_markup(
+                self.l + "\nNo stars found")
+            return
+        im32 = np.dstack((imL, imL, imL, imL))
+        surface = cairo.ImageSurface.create_for_data(
+            im32, cairo.FORMAT_RGB24, imL.shape[1], imL.shape[0])
+        cr = cairo.Context(surface)
+        self.focuser.draw(cr, "sharpness")
+        v = self.focuser.get("sharpness")
+        self.label.set_markup(
+            self.l + "\n<b>%d</b> starts, sharp: <b>%.2f</b>" % (
+                self.focuser.num(), v.mean) +
+            "\nback <b>%.2f</b> std <b>%.2f</b>" % (
+                v.back, v.back_std))
+        imB = im32[:, :, 0]
+        imG = im32[:, :, 1]
+        imR = im32[:, :, 2]
+        print("Elapsed: %.2f" % (time.time() - start))
+        return np.dstack((imR, imG, imB)), 1, 0
 
 
 class HiContrast(ToolBox):
@@ -1588,6 +1669,7 @@ class Mainwindow(Gtk.Window):
         self.tool_box = Gtk.VBox()
         self.tools = (
             HiContrast(self, self.tool_box),
+            Focuser(self, self.tool_box),
         )
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         self.add(box)
