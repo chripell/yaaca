@@ -17,6 +17,7 @@ import imreg
 
 from optparse import OptionParser
 
+
 parser = OptionParser(usage = "usage: %prog [opts] [files or @file_list ...]")
 parser.add_option("--method", type = "int", default = 0, help = "0 FFT, 1 FFT Canny, 2 geometric, 3 imreg, 100 none")
 parser.add_option("--filter", type = "int", default = 0, help = "0 none 1 median 2 wavelet only ROI: 101 median  102 wavelet")
@@ -66,23 +67,6 @@ dir = options.out_dir
 save_npy = options.save_npy
 cores = options.cores
 
-defects = []
-if options.defect != "" :
-    with open(options.defect) as fp:
-        for line in fp:
-            defects.append([int(x) for x in line.split(",")])
-
-defect_cols = []
-if options.defect_col != "" :
-    with open(options.defect_col) as fp:
-        for line in fp:
-            defect_cols.append(int(line))
-
-if dark != "N" :
-    darkf = AL.load_pic(dark, im_mode)
-
-ref = None
-debug = False
 
 def bin_ndarray(ndarray, new_shape, operation='sum'):
     """
@@ -251,15 +235,32 @@ def process_image(ii):
         imout = [np.roll(np.roll(x, xshift, axis=0), yshift, axis=1) for x in imSP]
         save_image(idx + 1, imout, 0, "sp_")
     
+if __name__ == "__main__":
+    defects = []
+    if options.defect != "" :
+        with open(options.defect) as fp:
+            for line in fp:
+                defects.append([int(x) for x in line.split(",")])
 
-all = AL.expand_args(args)
-base, nim, baseL, baseSP = prepare_image(all[0])
-ref = get_ref(nim)
-save_image(0, base, im_mode)
-if im_mode == 16:
-    save_image(0, [baseL], 1, "bw_")
-    save_image(0, baseSP, 0, "sp_")
-todo = [(idx, im, ref) for idx, im in enumerate(all[1:])]
+    defect_cols = []
+    if options.defect_col != "" :
+        with open(options.defect_col) as fp:
+            for line in fp:
+                defect_cols.append(int(line))
 
-pool = multiprocessing.Pool(cores)
-pool.map(process_image, todo)
+    if dark != "N" :
+        darkf = AL.load_pic(dark, im_mode)
+
+    ref = None
+    debug = False
+
+    all = AL.expand_args(args)
+    base, nim, baseL, baseSP = prepare_image(all[0])
+    ref = get_ref(nim)
+    save_image(0, base, im_mode)
+    if im_mode == 16:
+        save_image(0, [baseL], 1, "bw_")
+        save_image(0, baseSP, 0, "sp_")
+    todo = [(idx, im, ref) for idx, im in enumerate(all[1:])]
+    with multiprocessing.Pool(cores) as pool:
+        pool.map(process_image, todo)
